@@ -233,4 +233,23 @@ export class BetsService {
       );
     }
   }
+
+  async findUserBets(userAddress: string): Promise<Bet[]> {
+    try {
+      const bets = await this.betModel.find({
+        userAddress: userAddress,
+      });
+
+      return bets;
+    } catch (error: any) {
+      throw new HttpException(
+        `Error Finding Bet: ${error.message}`,
+        HttpStatus.BAD_GATEWAY,
+        {
+          cause: error.message,
+          description: error,
+        },
+      );
+    }
+  }
 }

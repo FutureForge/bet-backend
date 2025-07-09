@@ -6,17 +6,14 @@ import {
   PredictionAPIResponse,
   FormattedPrediction,
   MatchStatsStatus,
+  GroupedFixturesResponse,
+  CountryFixtures,
+  Country,
 } from '../types/matches.type';
 import {
   convertTimestampToTime,
   generateOdds,
 } from '../../global/providers/utils.provider';
-
-interface Countries {
-  id: number;
-  name: string;
-  code: string;
-}
 
 interface CacheEntry {
   data: Fixture;
@@ -26,17 +23,32 @@ interface CacheEntry {
 
 @Injectable()
 export class MatchesProvider {
-  private countries: Countries[] = [
-    { id: 39, name: 'England', code: 'GB-ENG' },
-    { id: 135, name: 'Italy', code: 'IT' },
-    { id: 140, name: 'Spain', code: 'ES' },
+  private countries: Country[] = [
+    {
+      id: 39,
+      name: 'England',
+      code: 'GB-ENG',
+      flag: 'https://media.api-sports.io/flags/gb-eng.svg',
+    },
+    {
+      id: 135,
+      name: 'Italy',
+      code: 'IT',
+      flag: 'https://media.api-sports.io/flags/it.svg',
+    },
+    {
+      id: 140,
+      name: 'Spain',
+      code: 'ES',
+      flag: 'https://media.api-sports.io/flags/es.svg',
+    },
   ];
 
   private season = 2025;
 
   // In-memory cache for single fixtures
   private fixtureCache: Map<string, CacheEntry> = new Map();
-  
+
   // Cache TTL configurations (in milliseconds)
   private readonly CACHE_TTL_LIVE_MATCH = 30000; // 30 seconds for live matches
   private readonly CACHE_TTL_FINISHED_MATCH = 900000; // 15 minutes for finished matches
@@ -61,6 +73,8 @@ export class MatchesProvider {
     const fixtureResponse =
       await this.callFootballAPI<FixtureAPIResponse>(endpoint);
     const fixture = fixtureResponse.response[0];
+
+    const fixturePrediction = await this.getPrediction(fixture.fixture.id);
 
     const formattedFixtures = {
       id: fixture.fixture.id,
@@ -88,6 +102,7 @@ export class MatchesProvider {
         isHomeWinner: fixture.teams.home.winner,
         isAwayWinner: fixture.teams.away.winner,
       },
+      prediction: fixturePrediction,
     };
 
     // Cache the result with appropriate TTL
@@ -96,7 +111,7 @@ export class MatchesProvider {
     return formattedFixtures;
   }
 
-  public async getFixtures(): Promise<Fixture[]> {
+  public async getFixtures(): Promise<GroupedFixturesResponse> {
     const today = new Date();
     const sevenDaysLater = new Date(today);
     sevenDaysLater.setDate(today.getDate() + 7);
@@ -106,7 +121,7 @@ export class MatchesProvider {
     const fromDate = '2025-08-15';
     const toDate = '2025-08-18';
 
-    const allFixtures: Fixture[] = [];
+    const groupedFixtures: GroupedFixturesResponse = [];
 
     for (const country of this.countries) {
       const league = country.id;
@@ -167,10 +182,21 @@ export class MatchesProvider {
         }),
       );
 
-      allFixtures.push(...fixturesWithCountry);
+      // Group fixtures by country
+      const countryFixtures: CountryFixtures = {
+        country: {
+          id: country.id,
+          name: country.name,
+          code: country.code,
+          flag: country.flag,
+        },
+        fixtures: fixturesWithCountry,
+      };
+
+      groupedFixtures.push(countryFixtures);
     }
 
-    return allFixtures;
+    return groupedFixtures;
   }
 
   private async getPrediction(fixtureId: number): Promise<FormattedPrediction> {
@@ -258,7 +284,7 @@ export class MatchesProvider {
    */
   private getFromCache(fixtureId: string): Fixture | null {
     const cacheEntry = this.fixtureCache.get(fixtureId);
-    
+
     if (!cacheEntry) {
       return null;
     }
@@ -336,8 +362,8 @@ export class MatchesProvider {
       }
     }
 
-    expiredKeys.forEach(key => this.fixtureCache.delete(key));
-    
+    expiredKeys.forEach((key) => this.fixtureCache.delete(key));
+
     if (expiredKeys.length > 0) {
       console.log(`Cleaned up ${expiredKeys.length} expired cache entries`);
     }
@@ -380,14 +406,17 @@ export class MatchesProvider {
   } {
     const entries = Array.from(this.fixtureCache.entries());
     const timestamps = entries.map(([_, entry]) => entry.timestamp);
-    
+
     return {
       size: this.fixtureCache.size,
       entries: Array.from(this.fixtureCache.keys()),
-      totalMemoryUsage: JSON.stringify(Array.from(this.fixtureCache.values())).length,
-      averageEntrySize: this.fixtureCache.size > 0 
-        ? JSON.stringify(Array.from(this.fixtureCache.values())).length / this.fixtureCache.size 
-        : 0,
+      totalMemoryUsage: JSON.stringify(Array.from(this.fixtureCache.values()))
+        .length,
+      averageEntrySize:
+        this.fixtureCache.size > 0
+          ? JSON.stringify(Array.from(this.fixtureCache.values())).length /
+            this.fixtureCache.size
+          : 0,
       oldestEntry: timestamps.length > 0 ? Math.min(...timestamps) : null,
       newestEntry: timestamps.length > 0 ? Math.max(...timestamps) : null,
     };

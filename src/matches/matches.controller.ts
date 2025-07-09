@@ -20,6 +20,11 @@ export class MatchesController {
     return this.matchesService.getAllFixtures();
   }
 
+  @Get(':fixtureId')
+  singleFixture(@Param('fixtureId') fixtureId: string) {
+    return this.matchesService.getSingleFixture(fixtureId);
+  }
+
   @Get('cache/status')
   getCacheStatus() {
     return this.matchesService.getCacheStatus();

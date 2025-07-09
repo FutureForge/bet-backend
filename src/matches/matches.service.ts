@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { MatchesProvider } from './provider/matches-provider.provider';
-import { Fixture } from './types/matches.type';
+import { Fixture, GroupedFixturesResponse } from './types/matches.type';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject } from '@nestjs/common';
 import { Cache } from 'cache-manager';
@@ -23,21 +23,21 @@ export class MatchesService {
     try {
       const fixtures = await this.matchesProvider.getFixtures();
       await this.cacheManager.set(this.CACHE_KEY, fixtures, this.CACHE_TTL);
-      this.logger.debug(`Cached ${fixtures.length} fixtures for 1 hour`);
+      this.logger.debug(`Cached ${fixtures.length} country groups for 1 hour`);
     } catch (error) {
       this.logger.error('Failed to fetch and cache matches data:', error);
     }
   }
 
-  async getAllFixtures(): Promise<Fixture[]> {
-    let fixtures = await this.cacheManager.get<Fixture[]>(this.CACHE_KEY);
+  async getAllFixtures(): Promise<GroupedFixturesResponse> {
+    let fixtures = await this.cacheManager.get<GroupedFixturesResponse>(this.CACHE_KEY);
 
     if (!fixtures) {
       this.logger.debug('Cache miss, fetching fresh data');
       try {
         fixtures = await this.matchesProvider.getFixtures();
         await this.cacheManager.set(this.CACHE_KEY, fixtures, this.CACHE_TTL);
-        this.logger.debug(`Cached ${fixtures.length} fixtures for 1 hour`);
+        this.logger.debug(`Cached ${fixtures.length} country groups for 1 hour`);
       } catch (error) {
         this.logger.error('Failed to fetch fixtures data:', error);
         throw error;
@@ -81,7 +81,7 @@ export class MatchesService {
       newestEntry: number | null;
     };
   }> {
-    const fixtures = await this.cacheManager.get<Fixture[]>(this.CACHE_KEY);
+    const fixtures = await this.cacheManager.get<GroupedFixturesResponse>(this.CACHE_KEY);
     const fixtureCacheStats = this.matchesProvider.getDetailedCacheStats();
     
     return {

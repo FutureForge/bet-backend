@@ -33,4 +33,9 @@ export class BetsController {
   findByBetId(@Param('id') id: string) {
     return this.betsService.findByBetId(+id);
   }
+
+  @Get('/user/:userAddress')
+  findUserBets(@Param('userAddress') userAddress: string) {
+    return this.betsService.findUserBets(userAddress);
+  }
 }
