@@ -9,6 +9,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { CacheModule } from '@nestjs/cache-manager';
 import { ScheduleModule } from '@nestjs/schedule';
 import { MatchesModule } from './matches/matches.module';
+import { BetsModule } from './bets/bets.module';
 
 @Module({
   imports: [
@@ -36,6 +37,8 @@ import { MatchesModule } from './matches/matches.module';
     ScheduleModule.forRoot({}),
 
     MatchesModule,
+
+    BetsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
