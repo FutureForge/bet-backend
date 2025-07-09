@@ -4,7 +4,13 @@ import {
   FixtureAPIResponse,
   FixtureResponse,
   Fixture,
+  PredictionAPIResponse,
+  FormattedPrediction,
 } from '../types/matches.type';
+import {
+  convertTimestampToTime,
+  generateOdds,
+} from '../../global/providers/utils.provider';
 
 interface Countries {
   id: number;
@@ -24,31 +30,6 @@ export class MatchesProvider {
 
   constructor(private readonly configService: ConfigService) {}
 
-  /**
-   * Convert Unix timestamp to readable time format based on timezone
-   * @param timestamp - Unix timestamp in seconds
-   * @param timezone - Timezone string (e.g., 'UTC', 'Europe/London', 'America/New_York')
-   * @returns Formatted time string (e.g., '15:30', '3:30 PM')
-   */
-  private convertTimestampToTime(timestamp: number, timezone: string): string {
-    try {
-      // Convert seconds to milliseconds if needed
-      const milliseconds = timestamp * 1000;
-      
-      // Create date object
-      const date = new Date(milliseconds);
-      
-      // Format time as HH:MM
-      const hours = date.getHours().toString().padStart(2, '0');
-      const minutes = date.getMinutes().toString().padStart(2, '0');
-      
-      return `${hours}:${minutes}`;
-    } catch (error) {
-      console.error(`Error converting timestamp ${timestamp} with timezone ${timezone}:`, error);
-      return '00:00'; // Fallback time
-    }
-  }
-
   async getFixtures(): Promise<Fixture[]> {
     const today = new Date();
     const sevenDaysLater = new Date(today);
@@ -58,11 +39,6 @@ export class MatchesProvider {
 
     const fromDate = '2025-08-15';
     const toDate = '2025-08-18';
-
-    console.log({ fromDate, toDate });
-
-    const countriesLength = this.countries.length;
-    console.log({ countriesLength });
 
     const allFixtures: Fixture[] = [];
 
@@ -81,40 +57,79 @@ export class MatchesProvider {
 
       const fixturesResponse = fixtures.response;
 
-      const fixturesWithCountry = fixturesResponse.map((fixture) => {
-        const formattedFixtures = {
-          id: fixture.fixture.id,
-          date: fixture.fixture.date,
-          time: this.convertTimestampToTime(fixture.fixture.timestamp, fixture.fixture.timezone),
-          timezone: fixture.fixture.timezone,
-          venue: fixture.fixture.venue.name,
-          leagueCountry: fixture.league.country,
-          leagueName: fixture.league.name,
-          leagueLogo: fixture.league.logo,
-          leagueFlag: fixture.league.flag,
-          matchDay: fixture.league.round,
-          homeTeamId: fixture.teams.home.id,
-          homeTeam: fixture.teams.home.name,
-          homeTeamLogo: fixture.teams.home.logo,
-          awayTeamId: fixture.teams.away.id,
-          awayTeam: fixture.teams.away.name,
-          awayTeamLogo: fixture.teams.away.logo,
-          country: {
-            id: country.id,
-            name: country.name,
-            code: country.code,
-          },
-        };
+      const fixturesWithCountry = await Promise.all(
+        fixturesResponse.map(async (fixture) => {
+          const fixturePrediction = await this.getPrediction(
+            fixture.fixture.id,
+          );
+          console.log({ fixturePrediction });
 
-        return formattedFixtures;
-      });
+          const formattedFixtures = {
+            id: fixture.fixture.id,
+            date: fixture.fixture.date,
+            time: convertTimestampToTime(
+              fixture.fixture.timestamp,
+              fixture.fixture.timezone,
+            ),
+            timezone: fixture.fixture.timezone,
+            venue: fixture.fixture.venue.name,
+            leagueCountry: fixture.league.country,
+            leagueName: fixture.league.name,
+            leagueLogo: fixture.league.logo,
+            leagueFlag: fixture.league.flag,
+            matchDay: fixture.league.round,
+            homeTeamId: fixture.teams.home.id,
+            homeTeam: fixture.teams.home.name,
+            homeTeamLogo: fixture.teams.home.logo,
+            awayTeamId: fixture.teams.away.id,
+            awayTeam: fixture.teams.away.name,
+            awayTeamLogo: fixture.teams.away.logo,
+            country: {
+              id: country.id,
+              name: country.name,
+              code: country.code,
+            },
+            prediction: fixturePrediction,
+          };
+
+          return formattedFixtures;
+        }),
+      );
 
       allFixtures.push(...fixturesWithCountry);
-      console.log({ fixturesResponse });
     }
 
-    console.log(`Total fixtures found: ${allFixtures.length}`);
     return allFixtures;
+  }
+
+  async getPrediction(fixtureId: number): Promise<FormattedPrediction> {
+    const endpoint = `predictions?fixture=${fixtureId}`;
+
+    const fixturePrediction =
+      await this.callFootballAPI<PredictionAPIResponse>(endpoint);
+
+    const predictionResponse = fixturePrediction.response[0];
+
+    const odds = generateOdds(
+      predictionResponse.predictions.percent,
+      predictionResponse.comparison,
+    );
+
+    const formattedPrediction: FormattedPrediction = {
+      homePercent: predictionResponse.predictions.percent.home,
+      awayPercent: predictionResponse.predictions.percent.away,
+      drawPercent: predictionResponse.predictions.percent.draw,
+      advice: predictionResponse.predictions.advice,
+      h2hHome: predictionResponse.comparison.h2h.home,
+      h2hAway: predictionResponse.comparison.h2h.away,
+      h2hGoalsHome: predictionResponse.comparison.goals.home,
+      h2hGoalsAway: predictionResponse.comparison.goals.away,
+      h2hTotalHome: predictionResponse.comparison.total.home,
+      h2hTotalAway: predictionResponse.comparison.total.away,
+      odds,
+    };
+
+    return formattedPrediction;
   }
 
   /**
