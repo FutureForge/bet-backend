@@ -8,11 +8,20 @@ import {
   Delete,
   HttpCode,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { LeaderboardQueryDto } from './dto/leaderboard.dto';
+import { LeaderboardEntryDto } from './dto/leaderboard-response.dto';
 import { User } from './entities/user.entity';
 
 @ApiTags('users')
@@ -55,6 +64,37 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'User not found' })
   findByAddress(@Param('address') address: string): Promise<User | null> {
     return this.usersService.findByAddress(address);
+  }
+
+  @Get('leaderboard')
+  @ApiOperation({ summary: 'Get leaderboard' })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    enum: ['totalWon', 'totalWagered', 'winCount', 'winRate'],
+    description: 'Type of leaderboard to retrieve',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Number of results to return (1-100)',
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: false,
+    type: Number,
+    description: 'Number of results to skip for pagination',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Leaderboard retrieved successfully',
+    type: [LeaderboardEntryDto],
+  })
+  getLeaderboard(
+    @Query() query: LeaderboardQueryDto,
+  ): Promise<LeaderboardEntryDto[]> {
+    return this.usersService.getLeaderboard(query);
   }
 
   @Patch(':address')

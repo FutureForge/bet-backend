@@ -8,6 +8,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { LeaderboardEntryDto } from './dto/leaderboard-response.dto';
 import { User, UserDocument } from './entities/user.entity';
 
 @Injectable()
@@ -196,6 +197,122 @@ export class UsersService {
 
       throw new HttpException(
         `Error updating user stats: ${error.message}`,
+        HttpStatus.BAD_GATEWAY,
+        {
+          cause: error.message,
+          description: error,
+        },
+      );
+    }
+  }
+
+  async getLeaderboard({
+    type = 'totalWon',
+    limit = 10,
+    offset = 0,
+  }: {
+    type?: 'totalWon' | 'totalWagered' | 'winCount' | 'winRate';
+    limit?: number;
+    offset?: number;
+  }): Promise<LeaderboardEntryDto[]> {
+    try {
+      let sortCriteria: any = {};
+      let projection: any = {};
+
+      switch (type) {
+        case 'totalWon':
+          sortCriteria = { totalWon: -1 };
+          break;
+        case 'totalWagered':
+          sortCriteria = { totalWagered: -1 };
+          break;
+        case 'winCount':
+          sortCriteria = { winCount: -1 };
+          break;
+        case 'winRate':
+          // For win rate, we'll calculate it in the aggregation pipeline
+          const pipeline = [
+            {
+              $addFields: {
+                winRate: {
+                  $cond: {
+                    if: { $gt: [{ $add: ['$winCount', '$lossCount'] }, 0] },
+                    then: {
+                      $multiply: [
+                        { $divide: ['$winCount', { $add: ['$winCount', '$lossCount'] }] },
+                        100
+                      ]
+                    },
+                    else: 0
+                  }
+                }
+              }
+            },
+            { $sort: { winRate: -1 as any } },
+            { $skip: offset },
+            { $limit: limit }
+          ];
+
+          const winRateResults = await this.userModel.aggregate(pipeline).exec();
+          
+          // Add rank manually and transform to DTO format
+          return winRateResults.map((user, index) => ({
+            _id: user._id.toString(),
+            address: user.address,
+            username: user.username,
+            totalWagered: user.totalWagered,
+            totalWon: user.totalWon,
+            winCount: user.winCount,
+            lossCount: user.lossCount,
+            rank: offset + index + 1,
+            winRate: user.winRate,
+            createdAt: user.createdAt,
+            lastActiveAt: user.lastActiveAt,
+          }));
+        default:
+          sortCriteria = { totalWon: -1 };
+      }
+
+      // Handle non-winRate cases
+      if (type === 'totalWon' || type === 'totalWagered' || type === 'winCount') {
+        const users = await this.userModel
+          .find()
+          .sort(sortCriteria)
+          .skip(offset)
+          .limit(limit)
+          .exec();
+
+        // Calculate win rate for each user and transform to DTO format
+        const usersWithRank = users.map((user, index) => {
+          const totalGames = user.winCount + user.lossCount;
+          const winRate = totalGames > 0 ? (user.winCount / totalGames) * 100 : 0;
+          
+          return {
+            _id: user._id.toString(),
+            address: user.address,
+            username: user.username,
+            totalWagered: user.totalWagered,
+            totalWon: user.totalWon,
+            winCount: user.winCount,
+            lossCount: user.lossCount,
+            rank: offset + index + 1,
+            winRate: Math.round(winRate * 100) / 100, // Round to 2 decimal places
+            createdAt: user.createdAt,
+            lastActiveAt: user.lastActiveAt,
+          };
+        });
+
+        return usersWithRank;
+      }
+
+      return [];
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        `Error fetching leaderboard: ${error.message}`,
         HttpStatus.BAD_GATEWAY,
         {
           cause: error.message,
