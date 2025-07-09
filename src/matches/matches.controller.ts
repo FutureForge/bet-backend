@@ -29,4 +29,9 @@ export class MatchesController {
   clearCache() {
     return this.matchesService.clearFixturesCache();
   }
+
+  @Delete('cache/individual')
+  clearIndividualCache() {
+    return this.matchesService.clearIndividualFixtureCache();
+  }
 }

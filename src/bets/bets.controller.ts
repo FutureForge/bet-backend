@@ -9,7 +9,6 @@ import {
 } from '@nestjs/common';
 import { BetsService } from './bets.service';
 import { CreateBetDto } from './dto/create-bet.dto';
-import { UpdateBetDto } from './dto/update-bet.dto';
 
 @Controller('bets')
 export class BetsController {
@@ -23,6 +22,11 @@ export class BetsController {
   @Get()
   findAll() {
     return this.betsService.findAll();
+  }
+
+  @Get('unresolved')
+  findUnresolvedBets() {
+    return this.betsService.findAllUnresolvedBet();
   }
 
   @Get(':id')

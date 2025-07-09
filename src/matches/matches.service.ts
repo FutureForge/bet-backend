@@ -31,7 +31,7 @@ export class MatchesService {
 
   async getAllFixtures(): Promise<Fixture[]> {
     let fixtures = await this.cacheManager.get<Fixture[]>(this.CACHE_KEY);
-    
+
     if (!fixtures) {
       this.logger.debug('Cache miss, fetching fresh data');
       try {
@@ -45,21 +45,52 @@ export class MatchesService {
     } else {
       this.logger.debug('Cache hit, returning cached data');
     }
-    
+
     return fixtures;
+  }
+
+  async getSingleFixture(fixtureId: string): Promise<Fixture> {
+    const fixture = await this.matchesProvider.getSingleFixture(fixtureId);
+    return fixture;
   }
 
   async clearFixturesCache(): Promise<void> {
     await this.cacheManager.del(this.CACHE_KEY);
-    this.logger.debug('Fixtures cache cleared');
+    // Clear individual fixture cache as well
+    this.matchesProvider.clearAllFixtureCache();
+    this.logger.debug('All fixtures cache cleared');
   }
 
-  async getCacheStatus(): Promise<{ cached: boolean; key: string; ttl: number }> {
+  async clearIndividualFixtureCache(): Promise<void> {
+    this.matchesProvider.clearAllFixtureCache();
+    this.logger.debug('Individual fixtures cache cleared');
+  }
+
+  async getCacheStatus(): Promise<{
+    fixturesListCache: {
+      cached: boolean;
+      key: string;
+      ttl: number;
+    };
+    individualFixturesCache: {
+      size: number;
+      entries: string[];
+      totalMemoryUsage: number;
+      averageEntrySize: number;
+      oldestEntry: number | null;
+      newestEntry: number | null;
+    };
+  }> {
     const fixtures = await this.cacheManager.get<Fixture[]>(this.CACHE_KEY);
+    const fixtureCacheStats = this.matchesProvider.getDetailedCacheStats();
+    
     return {
-      cached: !!fixtures,
-      key: this.CACHE_KEY,
-      ttl: this.CACHE_TTL,
+      fixturesListCache: {
+        cached: !!fixtures,
+        key: this.CACHE_KEY,
+        ttl: this.CACHE_TTL,
+      },
+      individualFixturesCache: fixtureCacheStats,
     };
   }
 }

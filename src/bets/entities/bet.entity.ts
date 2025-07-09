@@ -4,7 +4,7 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export type SelectedOutcome = 'home' | 'away' | 'draw';
 export type BetResult = 'pending' | 'won' | 'lost';
-export type MatchResult = 'pending' | 'won' | 'lost' | 'draw';
+export type MatchResult = 'pending' | 'home' | 'away' | 'draw';
 
 @Schema({ timestamps: true })
 export class Bet {
@@ -96,12 +96,12 @@ export class Bet {
 
   @ApiProperty({
     description: 'Result of the match',
-    enum: ['pending', 'won', 'lost', 'draw'],
+    enum: ['pending', 'home', 'away', 'draw'],
     example: 'pending',
   })
   @Prop({
     type: String,
-    enum: ['pending', 'won', 'lost', 'draw'],
+    enum: ['pending', 'home', 'away', 'draw'],
     required: true,
     default: 'pending',
   })

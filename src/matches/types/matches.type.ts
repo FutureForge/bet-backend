@@ -96,14 +96,42 @@ export type Fixture = {
   awayTeamId: number;
   awayTeam: string;
   awayTeamLogo: string;
-  country: {
+  widget: string;
+  country?: {
     id: number;
     name: string;
     code: string;
   };
-  widget: string;
   prediction?: FormattedPrediction;
+  matchStats: {
+    status: MatchStatsStatus;
+    isHomeWinner: boolean;
+    isAwayWinner: boolean;
+  };
 };
+
+export type MatchStatsStatus = 
+  | 'FT'    // Full Time
+  | 'NS'    // Not Started
+  | '1H'    // First Half
+  | 'HT'    // Half Time
+  | '2H'    // Second Half
+  | 'ET'    // Extra Time
+  | 'P'     // Penalty
+  | 'BT'    // Break Time
+  | 'LIVE'  // Live
+  | 'AET'   // After Extra Time
+  | 'PEN'   // Penalties
+  | 'FT_PEN' // Full Time Penalties
+  | 'TBD'   // To Be Defined
+  | 'POSTP' // Postponed
+  | 'SUSP'  // Suspended
+  | 'INT'   // Interrupted
+  | 'CANC'  // Cancelled
+  | 'ABD'   // Abandoned
+  | 'AWD'   // Technical Loss
+  | 'WO'    // Walkover
+  | 'LIVE'; // Live (duplicate, but keeping for compatibility)
 
 export type PredictionAPIResponse = {
   get: string;
