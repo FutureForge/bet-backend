@@ -101,6 +101,7 @@ export type Fixture = {
     name: string;
     code: string;
   };
+  widget: string;
   prediction?: FormattedPrediction;
 };
 

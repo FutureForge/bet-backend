@@ -29,7 +29,7 @@ import { MatchesModule } from './matches/matches.module';
     }),
 
     CacheModule.register({
-      ttl: 50000,
+      ttl: 3600000, // 1 hour in milliseconds
       isGlobal: true,
     }),
 

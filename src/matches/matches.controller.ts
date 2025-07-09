@@ -15,33 +15,18 @@ import { UpdateMatchDto } from './dto/update-match.dto';
 export class MatchesController {
   constructor(private readonly matchesService: MatchesService) {}
 
-  @Get('fixtures')
+  @Get('')
   allFixtures() {
     return this.matchesService.getAllFixtures();
   }
 
-  @Post()
-  create(@Body() createMatchDto: CreateMatchDto) {
-    return this.matchesService.create(createMatchDto);
+  @Get('cache/status')
+  getCacheStatus() {
+    return this.matchesService.getCacheStatus();
   }
 
-  @Get()
-  findAll() {
-    return this.matchesService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.matchesService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateMatchDto: UpdateMatchDto) {
-    return this.matchesService.update(+id, updateMatchDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.matchesService.remove(+id);
+  @Delete('cache')
+  clearCache() {
+    return this.matchesService.clearFixturesCache();
   }
 }

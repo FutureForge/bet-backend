@@ -2,7 +2,6 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   FixtureAPIResponse,
-  FixtureResponse,
   Fixture,
   PredictionAPIResponse,
   FormattedPrediction,
@@ -30,7 +29,7 @@ export class MatchesProvider {
 
   constructor(private readonly configService: ConfigService) {}
 
-  async getFixtures(): Promise<Fixture[]> {
+  public async getFixtures(): Promise<Fixture[]> {
     const today = new Date();
     const sevenDaysLater = new Date(today);
     sevenDaysLater.setDate(today.getDate() + 7);
@@ -62,7 +61,6 @@ export class MatchesProvider {
           const fixturePrediction = await this.getPrediction(
             fixture.fixture.id,
           );
-          console.log({ fixturePrediction });
 
           const formattedFixtures = {
             id: fixture.fixture.id,
@@ -89,6 +87,7 @@ export class MatchesProvider {
               name: country.name,
               code: country.code,
             },
+            widget: this.fixtureWidget(fixture.fixture.id.toString()),
             prediction: fixturePrediction,
           };
 
@@ -102,7 +101,7 @@ export class MatchesProvider {
     return allFixtures;
   }
 
-  async getPrediction(fixtureId: number): Promise<FormattedPrediction> {
+  private async getPrediction(fixtureId: number): Promise<FormattedPrediction> {
     const endpoint = `predictions?fixture=${fixtureId}`;
 
     const fixturePrediction =
@@ -132,12 +131,28 @@ export class MatchesProvider {
     return formattedPrediction;
   }
 
+  private fixtureWidget(fixtureId: string): string {
+    return ` <div id="wg-api-football-game"
+        data-host="v3.football.api-sports.io"
+        data-key="Your-Api-Key-Here"
+        data-id=${fixtureId}
+        data-theme=""
+        data-refresh="15"
+        data-show-errors="false"
+         data-show-logos="true">
+      </div>
+      <script
+        type="module"
+        src="https://widgets.api-sports.io/2.0.3/widgets.js">
+      </script> `;
+  }
+
   /**
    * Generic function to call the football API from anywhere in the application
    * @param endpoint - The API endpoint (e.g., '/fixtures?live=all', '/teams/countries')
    * @returns Promise with the API response
    */
-  async callFootballAPI<T = any>(endpoint: string): Promise<T> {
+  private async callFootballAPI<T = any>(endpoint: string): Promise<T> {
     const baseUrl = this.configService.get<string>('SPORT_API_URL');
     const apiKey = this.configService.get<string>('SPORT_API_KEY');
 
