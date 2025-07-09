@@ -7,6 +7,7 @@ import { Model } from 'mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { MatchesService } from 'src/matches/matches.service';
 import { MatchesProvider } from 'src/matches/provider/matches-provider.provider';
+import { UsersService } from 'src/users/users.service';
 
 @Injectable()
 export class BetsService {
@@ -17,8 +18,11 @@ export class BetsService {
     private readonly betModel: Model<Bet>,
 
     private matchProvider: MatchesProvider,
+
+    private usersService: UsersService,
   ) {}
 
+  // @Cron(CronExpression.EVERY_10_SECONDS)
   @Cron('0 */15 * * * *')
   async handleBet() {
     this.logger.debug('Updating bet data every 15 minutes');
@@ -72,6 +76,20 @@ export class BetsService {
                 betId: bet.betId.toString(),
                 betResult,
                 matchResult,
+              });
+
+              // updating user info
+              const winnings =
+                betResult === 'won' ? bet.betAmount * bet.oddsAtPlacement : 0;
+
+              await this.usersService.updateStats({
+                address: bet.userAddress,
+                stats: {
+                  totalWagered: bet.betAmount,
+                  totalWon: winnings,
+                  winCount: betResult === 'won' ? 1 : 0,
+                  lossCount: betResult === 'lost' ? 1 : 0,
+                },
               });
 
               this.logger.debug(
@@ -134,7 +152,7 @@ export class BetsService {
     }
   }
 
-  create(createBetDto: CreateBetDto): Promise<Bet> {
+  async create(createBetDto: CreateBetDto): Promise<Bet> {
     const {
       betAmount,
       betId,
@@ -145,6 +163,26 @@ export class BetsService {
     } = createBetDto;
 
     try {
+      // First, check if the match exists and get its status
+      const fixture = await this.matchProvider.getSingleFixture(
+        matchId.toString(),
+      );
+
+      if (!fixture) {
+        throw new HttpException(
+          `Match with ID ${matchId} not found`,
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      // Check if the match status is 'NS' (Not Started)
+      if (fixture.matchStats.status !== 'NS') {
+        throw new HttpException(
+          `Cannot place bet on match ${matchId}. Match status is ${fixture.matchStats.status}. Only matches with status 'NS' (Not Started) are allowed for betting.`,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
       const bet = new this.betModel({
         userAddress,
         betAmount,
@@ -162,6 +200,10 @@ export class BetsService {
 
       return bet.save();
     } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
       throw new HttpException(
         `Error Creating Bet: ${error.message}`,
         HttpStatus.BAD_GATEWAY,

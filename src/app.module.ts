@@ -10,6 +10,7 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { ScheduleModule } from '@nestjs/schedule';
 import { MatchesModule } from './matches/matches.module';
 import { BetsModule } from './bets/bets.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -39,6 +40,8 @@ import { BetsModule } from './bets/bets.module';
     MatchesModule,
 
     BetsModule,
+
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
