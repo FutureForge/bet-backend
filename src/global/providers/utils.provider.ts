@@ -41,7 +41,7 @@ export function generateOdds(
   // Helper to parse percent string to number
   const parse = (val: string) => parseFloat(val.replace('%', ''));
 
-  // Base odds
+  // Base odds from percentages
   const homeProb = Math.max(parse(percent.home), 0.01);
   const drawProb = Math.max(parse(percent.draw), 0.01);
   const awayProb = Math.max(parse(percent.away), 0.01);
@@ -49,27 +49,31 @@ export function generateOdds(
   let drawOdds = 100 / drawProb;
   let awayOdds = 100 / awayProb;
 
-  // Average comparison advantage
+  // Calculate average comparison advantage
   const homeAdv = (parse(comparison.h2h.home) + parse(comparison.goals.home) + parse(comparison.total.home)) / 3;
   const awayAdv = (parse(comparison.h2h.away) + parse(comparison.goals.away) + parse(comparison.total.away)) / 3;
   const advDiff = homeAdv - awayAdv; // positive: home advantage, negative: away advantage
 
-  // Moderate adjustment: up to ±7% based on advantage difference
+  // Moderate adjustment: up to ±10% based on advantage difference
   // Clamp advDiff to [-30, 30] for safety
   const clampedDiff = Math.max(-30, Math.min(30, advDiff));
-  const adjFactor = clampedDiff / 30 * 0.07; // max ±7%
+  const adjFactor = clampedDiff / 30 * 0.10; // max ±10%
 
-  // Adjust odds
-  homeOdds = homeOdds * (1 - adjFactor);
-  awayOdds = awayOdds * (1 + adjFactor);
-  // Draw odds: slight adjustment (half of home/away adjustment, opposite direction of max advantage)
-  drawOdds = drawOdds * (1 + Math.abs(adjFactor) * 0.5 * (advDiff < 0 ? -1 : 1));
+  // CORRECTED LOGIC: Dominant teams get LOWER odds, underdogs get HIGHER odds
+  // When home team has advantage (positive advDiff), reduce home odds and increase away odds
+  homeOdds = homeOdds * (1 - adjFactor); // Higher advantage = lower odds ✓
+  awayOdds = awayOdds * (1 + adjFactor); // Lower advantage = higher odds ✓
+  
+  // Draw odds: slight adjustment based on the stronger team
+  // If home is stronger, slightly reduce draw odds; if away is stronger, slightly increase
+  drawOdds = drawOdds * (1 - Math.abs(adjFactor) * 0.3 * (advDiff > 0 ? 1 : -1));
 
-  // Ensure odds are at least 1.01 and round to 2dp
-  const round = (n: number) => Math.max(1.01, Math.round(n * 100) / 100);
+  // Ensure odds are reasonable: minimum 1.01, maximum 50.00
+  const clamp = (n: number) => Math.max(1.01, Math.min(50.00, Math.round(n * 100) / 100));
+  
   return {
-    home: round(homeOdds),
-    draw: round(drawOdds),
-    away: round(awayOdds),
+    home: clamp(homeOdds),
+    draw: clamp(drawOdds),
+    away: clamp(awayOdds),
   };
 } 
