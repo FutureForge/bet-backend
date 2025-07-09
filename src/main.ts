@@ -20,6 +20,8 @@ async function bootstrap() {
     }),
   );
 
+  app.setGlobalPrefix('api');
+
   app.use(helmet());
   app.use(compression());
   app.enableCors({

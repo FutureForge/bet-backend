@@ -6,6 +6,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import databaseConfig from './config/database.config';
 import environmentValidation from './config/environmentValidation';
 import { MongooseModule } from '@nestjs/mongoose';
+import { CacheModule } from '@nestjs/cache-manager';
+import { ScheduleModule } from '@nestjs/schedule';
+import { MatchesModule } from './matches/matches.module';
 
 @Module({
   imports: [
@@ -24,6 +27,15 @@ import { MongooseModule } from '@nestjs/mongoose';
         useUnifiedTopology: true,
       }),
     }),
+
+    CacheModule.register({
+      ttl: 50000,
+      isGlobal: true,
+    }),
+
+    ScheduleModule.forRoot({}),
+
+    MatchesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
