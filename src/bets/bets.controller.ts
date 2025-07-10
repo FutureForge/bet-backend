@@ -13,7 +13,10 @@ import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { BetsService } from './bets.service';
 import { CreateBetDto } from './dto/create-bet.dto';
 import { UpdateBetSlipDto } from './dto/update-bet-slip.dto';
-import { BetSlipWithSelectionsResponseDto, BetSlipAndSelectionResponseDto } from './dto/bet-slip-response.dto';
+import {
+  BetSlipWithSelectionsResponseDto,
+  BetSlipAndSelectionResponseDto,
+} from './dto/bet-slip-response.dto';
 import { BetSlip } from './entities/bet-slip.entity';
 import { BetSelection } from './entities/bet-selection.entity';
 import { BetSlipAndSelection } from './types/bet.types';
@@ -36,7 +39,9 @@ export class BetsController {
   })
   @ApiResponse({ status: 404, description: 'Match not found' })
   @ApiResponse({ status: 502, description: 'Error creating bet slip' })
-  async create(@Body() createBetDto: CreateBetDto): Promise<BetSlip> {
+  async create(
+    @Body() createBetDto: CreateBetDto,
+  ): Promise<BetSlipAndSelection> {
     return await this.betsService.create(createBetDto);
   }
 
@@ -94,6 +99,34 @@ export class BetsController {
     @Param('userAddress') userAddress: string,
   ): Promise<BetSlipAndSelection[]> {
     return await this.betsService.findUserBetSlips(userAddress);
+  }
+
+  @Get('/user/unclaimed/:userAddress')
+  @ApiOperation({ summary: 'Get user unclaimed winning bet slips' })
+  @ApiParam({ name: 'userAddress', description: 'User wallet address' })
+  @ApiResponse({
+    status: 200,
+    description: 'User unclaimed winning bet slips found',
+    type: [BetSlipAndSelectionResponseDto],
+  })
+  async findUserUnclaimedBetSlips(
+    @Param('userAddress') userAddress: string,
+  ): Promise<BetSlipAndSelection[]> {
+    return await this.betsService.findUserUnclaimedWinnings(userAddress);
+  }
+
+  @Get('/user/claimed/:userAddress')
+  @ApiOperation({ summary: 'Get user claimed winning bet slips' })
+  @ApiParam({ name: 'userAddress', description: 'User wallet address' })
+  @ApiResponse({
+    status: 200,
+    description: 'User claimed winning bet slips found',
+    type: [BetSlipAndSelectionResponseDto],
+  })
+  async findUserClaimedBetSlips(
+    @Param('userAddress') userAddress: string,
+  ): Promise<BetSlipAndSelection[]> {
+    return await this.betsService.findUserClaimedWinnings(userAddress);
   }
 
   @Patch(':id')

@@ -40,7 +40,9 @@ export class BetsService {
    * Helper method to calculate total odds with precise decimal arithmetic
    * This prevents floating-point precision issues when multiplying decimal odds
    */
-  private calculateTotalOdds(selections: { oddsAtPlacement: number }[]): number {
+  private calculateTotalOdds(
+    selections: { oddsAtPlacement: number }[],
+  ): number {
     return selections.reduce((acc, selection) => {
       const result = parseFloat((acc * selection.oddsAtPlacement).toFixed(4));
       return result;
@@ -160,11 +162,9 @@ export class BetsService {
             betSlipResult = 'lost';
             actualWinnings = 0;
           } else {
-            // Some won, some lost (partially won)
-            betSlipResult = 'partially_won';
-            // Calculate partial winnings based on won selections
-            const totalOdds = this.calculateTotalOdds(wonSelections);
-            actualWinnings = betSlipData.betSlip.totalBetAmount * totalOdds;
+            // Mixed results - some won, some lost
+            betSlipResult = 'lost';
+            actualWinnings = 0;
           }
 
           // Update bet slip
@@ -196,7 +196,7 @@ export class BetsService {
     }
   }
 
-  async create(createBetDto: CreateBetDto): Promise<BetSlip> {
+  async create(createBetDto: CreateBetDto): Promise<BetSlipAndSelection> {
     const { userAddress, betSlipId, totalBetAmount, selections } = createBetDto;
 
     try {
@@ -274,9 +274,13 @@ export class BetsService {
         matchStartTime: selection.matchStartTime,
       }));
 
-      await this.betSelectionModel.insertMany(betSelections);
+      const savedBetSelection =
+        await this.betSelectionModel.insertMany(betSelections);
 
-      return savedBetSlip;
+      return {
+        betSlip: savedBetSlip,
+        betSelection: savedBetSelection,
+      };
     } catch (error: any) {
       if (error instanceof HttpException) {
         throw error;
@@ -539,6 +543,62 @@ export class BetsService {
     } catch (error: any) {
       throw new HttpException(
         `Error Finding User Bet Slips: ${error.message}`,
+        HttpStatus.BAD_GATEWAY,
+        {
+          cause: error.message,
+          description: error,
+        },
+      );
+    }
+  }
+
+  async findUserUnclaimedWinnings(
+    userAddress: string,
+  ): Promise<BetSlipAndSelection[]> {
+    try {
+      const userBets = await this.findUserBetSlips(userAddress);
+
+      const unclaimedWinnings = userBets.filter((bets) => {
+        const unclaimedBets =
+          bets.betSlip.actualWinnings !== 0 &&
+          bets.betSlip.status === 'resolved' &&
+          !bets.betSlip.isClaimed;
+
+        return unclaimedBets;
+      });
+
+      return unclaimedWinnings;
+    } catch (error: any) {
+      throw new HttpException(
+        `Error Finding User Unclaimed Winnings: ${error.message}`,
+        HttpStatus.BAD_GATEWAY,
+        {
+          cause: error.message,
+          description: error,
+        },
+      );
+    }
+  }
+
+  async findUserClaimedWinnings(
+    userAddress: string,
+  ): Promise<BetSlipAndSelection[]> {
+    try {
+      const userBets = await this.findUserBetSlips(userAddress);
+
+      const unclaimedWinnings = userBets.filter((bets) => {
+        const unclaimedBets =
+          bets.betSlip.actualWinnings !== 0 &&
+          bets.betSlip.status === 'claimed' &&
+          bets.betSlip.isClaimed;
+
+        return unclaimedBets;
+      });
+
+      return unclaimedWinnings;
+    } catch (error: any) {
+      throw new HttpException(
+        `Error Finding User Claimed Winnings: ${error.message}`,
         HttpStatus.BAD_GATEWAY,
         {
           cause: error.message,

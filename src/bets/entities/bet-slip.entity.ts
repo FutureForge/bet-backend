@@ -2,7 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, HydratedDocument, Types } from 'mongoose';
 import { ApiProperty } from '@nestjs/swagger';
 
-export type BetSlipResult = 'pending' | 'won' | 'lost' | 'partially_won';
+export type BetSlipResult = 'pending' | 'won' | 'lost';
 export type BetSlipStatus = 'pending' | 'resolved' | 'claimed';
 
 @Schema({ timestamps: true })
@@ -60,12 +60,12 @@ export class BetSlip {
 
   @ApiProperty({
     description: 'Overall result of the bet slip',
-    enum: ['pending', 'won', 'lost', 'partially_won'],
+    enum: ['pending', 'won', 'lost'],
     example: 'pending',
   })
   @Prop({
     type: String,
-    enum: ['pending', 'won', 'lost', 'partially_won'],
+    enum: ['pending', 'won', 'lost'],
     required: true,
     default: 'pending',
   })
@@ -137,6 +137,7 @@ export class BetSlip {
 
   @Prop({
     type: String,
+    default: '',
   })
   claimSignature?: string;
 
@@ -154,4 +155,4 @@ export class BetSlip {
 
 export type BetSlipDocument = HydratedDocument<BetSlip>;
 
-export const BetSlipSchema = SchemaFactory.createForClass(BetSlip); 
+export const BetSlipSchema = SchemaFactory.createForClass(BetSlip);

@@ -11,12 +11,12 @@ import { BetSlipResult, BetSlipStatus } from '../entities/bet-slip.entity';
 export class UpdateBetSlipDto {
   @ApiProperty({
     description: 'Overall result of the bet slip',
-    enum: ['pending', 'won', 'lost', 'partially_won'],
+    enum: ['pending', 'won', 'lost'],
     example: 'won',
   })
   @IsOptional()
   @IsString()
-  @IsIn(['pending', 'won', 'lost', 'partially_won'])
+  @IsIn(['pending', 'won', 'lost'])
   betSlipResult?: BetSlipResult;
 
   @ApiProperty({
