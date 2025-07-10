@@ -336,6 +336,7 @@ export interface Country {
   name: string;
   code: string;
   flag: string;
+  tableWidget?: string;
 }
 
 export type CountryFixtures = {

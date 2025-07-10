@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   FixtureAPIResponse,
@@ -23,6 +23,8 @@ interface CacheEntry {
 
 @Injectable()
 export class MatchesProvider {
+  private readonly logger = new Logger(MatchesProvider.name);
+
   private countries: Country[] = [
     {
       id: 39,
@@ -189,6 +191,7 @@ export class MatchesProvider {
           name: country.name,
           code: country.code,
           flag: country.flag,
+          tableWidget: this.leagueWidget({ league: country.id }),
         },
         fixtures: fixturesWithCountry,
       };
@@ -229,10 +232,33 @@ export class MatchesProvider {
     return formattedPrediction;
   }
 
+  private leagueWidget({ league }: { league: number }): string {
+    const apiKey = this.configService.get<string>('SPORT_API_KEY');
+
+    return `
+      <div id="wg-api-football-standings"
+        data-host="v3.football.api-sports.io"
+        data-key=${apiKey}
+        data-league=${league}
+        data-team=""
+        data-season=${this.season}
+        data-theme=""
+        data-show-errors="false"
+        data-show-logos="true"
+        class="wg_loader">
+      </div>
+    <script
+      type="module"
+      src="https://widgets.api-sports.io/2.0.3/widgets.js">
+    </script>`;
+  }
+
   private fixtureWidget(fixtureId: string): string {
+    const apiKey = this.configService.get<string>('SPORT_API_KEY');
+
     return ` <div id="wg-api-football-game"
         data-host="v3.football.api-sports.io"
-        data-key="Your-Api-Key-Here"
+        data-key=${apiKey}
         data-id=${fixtureId}
         data-theme=""
         data-refresh="15"
@@ -275,6 +301,7 @@ export class MatchesProvider {
 
       return await response.json();
     } catch (error) {
+      this.logger.error(`${error}`);
       throw new Error(`Failed to call football API: ${error.message}`);
     }
   }

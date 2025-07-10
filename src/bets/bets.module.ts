@@ -2,7 +2,11 @@ import { Module } from '@nestjs/common';
 import { BetsService } from './bets.service';
 import { BetsController } from './bets.controller';
 import { MongooseModule } from '@nestjs/mongoose';
-import { Bet, BetSchema } from './entities/bet.entity';
+import { BetSlip, BetSlipSchema } from './entities/bet-slip.entity';
+import {
+  BetSelection,
+  BetSelectionSchema,
+} from './entities/bet-selection.entity';
 import { MatchesProvider } from 'src/matches/provider/matches-provider.provider';
 import { UsersModule } from 'src/users/users.module';
 
@@ -12,8 +16,12 @@ import { UsersModule } from 'src/users/users.module';
   imports: [
     MongooseModule.forFeature([
       {
-        name: Bet.name,
-        schema: BetSchema,
+        name: BetSlip.name,
+        schema: BetSlipSchema,
+      },
+      {
+        name: BetSelection.name,
+        schema: BetSelectionSchema,
       },
     ]),
     UsersModule,

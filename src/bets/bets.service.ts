@@ -1,58 +1,83 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
-import { CreateBetDto } from './dto/create-bet.dto';
-import { UpdateBetDto } from './dto/update-bet.dto';
+import { CreateBetDto, BetSelectionDto } from './dto/create-bet.dto';
+import { UpdateBetSlipDto } from './dto/update-bet-slip.dto';
+import { UpdateSelectionDto } from './dto/update-selection.dto';
 import { InjectModel } from '@nestjs/mongoose';
-import { Bet, BetResult, MatchResult } from './entities/bet.entity';
-import { Model } from 'mongoose';
+import {
+  BetSlip,
+  BetSlipResult,
+  BetSlipStatus,
+} from './entities/bet-slip.entity';
+import {
+  BetSelection,
+  SelectionResult,
+  MatchResult,
+} from './entities/bet-selection.entity';
+import { Model, Types } from 'mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { MatchesService } from 'src/matches/matches.service';
 import { MatchesProvider } from 'src/matches/provider/matches-provider.provider';
 import { UsersService } from 'src/users/users.service';
+import { BetSlipAndSelection } from './types/bet.types';
 
 @Injectable()
 export class BetsService {
-  private readonly logger = new Logger(MatchesService.name);
+  private readonly logger = new Logger(BetsService.name);
 
   constructor(
-    @InjectModel(Bet.name)
-    private readonly betModel: Model<Bet>,
+    @InjectModel(BetSlip.name)
+    private readonly betSlipModel: Model<BetSlip>,
+
+    @InjectModel(BetSelection.name)
+    private readonly betSelectionModel: Model<BetSelection>,
 
     private matchProvider: MatchesProvider,
 
     private usersService: UsersService,
   ) {}
 
+  /**
+   * Helper method to calculate total odds with precise decimal arithmetic
+   * This prevents floating-point precision issues when multiplying decimal odds
+   */
+  private calculateTotalOdds(selections: { oddsAtPlacement: number }[]): number {
+    return selections.reduce((acc, selection) => {
+      const result = parseFloat((acc * selection.oddsAtPlacement).toFixed(4));
+      return result;
+    }, 1);
+  }
+
   // @Cron(CronExpression.EVERY_10_SECONDS)
   @Cron('0 */15 * * * *')
-  async handleBet() {
-    this.logger.debug('Updating bet data every 15 minutes');
+  async handleBetResolutions() {
+    this.logger.debug('Updating bet slip data every 15 minutes');
     try {
-      const unresolvedBets = await this.findAllUnresolvedBet();
+      const unresolvedSelections = await this.findAllUnresolvedSelections();
 
-      if (unresolvedBets.length === 0) {
-        this.logger.debug('No unresolved bet');
+      if (unresolvedSelections.length === 0) {
+        this.logger.debug('No unresolved selections');
         return;
       }
 
-      // Group bets by matchId to avoid multiple API calls for the same fixture
-      const betsByMatch = new Map<string, Bet[]>();
-      for (const bet of unresolvedBets) {
-        const matchId = bet.matchId.toString();
-        if (!betsByMatch.has(matchId)) {
-          betsByMatch.set(matchId, []);
+      // Group selections by matchId to avoid multiple API calls for the same fixture
+      const selectionsByMatch = new Map<string, BetSelection[]>();
+      for (const selection of unresolvedSelections) {
+        const matchId = selection.matchId.toString();
+        if (!selectionsByMatch.has(matchId)) {
+          selectionsByMatch.set(matchId, []);
         }
-        betsByMatch.get(matchId)!.push(bet);
+        selectionsByMatch.get(matchId)!.push(selection);
       }
 
       // Process each unique fixture
-      for (const [matchId, bets] of betsByMatch) {
+      for (const [matchId, selections] of selectionsByMatch) {
         try {
-          const betFixture = await this.matchProvider.getSingleFixture(matchId);
-          const isMatchOver = betFixture.matchStats.status === 'FT';
+          const fixture = await this.matchProvider.getSingleFixture(matchId);
+          const isMatchOver = fixture.matchStats.status === 'FT';
 
           if (isMatchOver) {
-            const isHomeWinner = betFixture.matchStats.isHomeWinner;
-            const isAwayWinner = betFixture.matchStats.isAwayWinner;
+            const isHomeWinner = fixture.matchStats.isHomeWinner;
+            const isAwayWinner = fixture.matchStats.isAwayWinner;
 
             let matchResult: MatchResult;
             if (isHomeWinner) {
@@ -63,42 +88,30 @@ export class BetsService {
               matchResult = 'draw';
             }
 
-            // Process all bets for this fixture
-            for (const bet of bets) {
-              let betResult: BetResult;
-              if (bet.selectedOutcome === matchResult) {
-                betResult = 'won';
+            // Process all selections for this fixture
+            for (const selection of selections) {
+              let selectionResult: SelectionResult;
+              if (selection.selectedOutcome === matchResult) {
+                selectionResult = 'won';
               } else {
-                betResult = 'lost';
+                selectionResult = 'lost';
               }
 
-              await this.updateBet({
-                betId: bet.betId.toString(),
-                betResult,
+              // Update selection with match outcome
+              await this.updateSelection({
+                betSlipId: selection.betSlipId,
+                matchId: selection.matchId,
+                selectionResult,
                 matchResult,
               });
 
-              // updating user info
-              const winnings =
-                betResult === 'won' ? bet.betAmount * bet.oddsAtPlacement : 0;
-
-              await this.usersService.updateStats({
-                address: bet.userAddress,
-                stats: {
-                  totalWagered: bet.betAmount,
-                  totalWon: winnings,
-                  winCount: betResult === 'won' ? 1 : 0,
-                  lossCount: betResult === 'lost' ? 1 : 0,
-                },
-              });
-
               this.logger.debug(
-                `Updated bet ${bet.betId}: ${betResult} (match: ${matchResult})`,
+                `Updated selection ${selection.betSlipId}-${selection.matchId}: ${selectionResult} (match: ${matchResult})`,
               );
             }
 
             this.logger.debug(
-              `Processed ${bets.length} bets for fixture ${matchId}`,
+              `Processed ${selections.length} selections for fixture ${matchId}`,
             );
           }
         } catch (error: any) {
@@ -107,105 +120,170 @@ export class BetsService {
           );
         }
       }
+
+      // After processing all selections, update bet slip results
+      await this.updateBetSlipResults();
     } catch (error: any) {
-      this.logger.error(`Error updating bet: ${error.message}`);
+      this.logger.error(`Error updating bet slips: ${error.message}`);
     }
   }
 
-  async updateBet({
-    betId,
-    betResult,
-    matchResult,
-  }: {
-    matchResult: MatchResult;
-    betResult: BetResult;
-    betId: string;
-  }) {
+  async updateBetSlipResults() {
     try {
-      const updatedBet = await this.betModel.findOneAndUpdate(
-        { betId: parseInt(betId) },
-        {
-          betResult,
-          matchResult,
-          resolvedAt: new Date(),
-        },
-        { new: true },
-      );
+      const pendingBetSlips = await this.findAllPendingBetSlips();
 
-      if (!updatedBet) {
-        throw new HttpException(
-          `Bet with ID ${betId} not found`,
-          HttpStatus.NOT_FOUND,
+      for (const betSlipData of pendingBetSlips) {
+        const selections = betSlipData.betSelection;
+
+        // Check if all selections are resolved
+        const allResolved = selections.every(
+          (selection) => selection.selectionResult !== 'pending',
         );
-      }
 
-      return updatedBet;
+        if (allResolved) {
+          const wonSelections = selections.filter(
+            (selection) => selection.selectionResult === 'won',
+          );
+          const lostSelections = selections.filter(
+            (selection) => selection.selectionResult === 'lost',
+          );
+
+          let betSlipResult: BetSlipResult;
+          let actualWinnings = 0;
+
+          if (lostSelections.length === 0) {
+            // All selections won
+            betSlipResult = 'won';
+            actualWinnings = betSlipData.betSlip.expectedPayment;
+          } else if (wonSelections.length === 0) {
+            // All selections lost
+            betSlipResult = 'lost';
+            actualWinnings = 0;
+          } else {
+            // Some won, some lost (partially won)
+            betSlipResult = 'partially_won';
+            // Calculate partial winnings based on won selections
+            const totalOdds = this.calculateTotalOdds(wonSelections);
+            actualWinnings = betSlipData.betSlip.totalBetAmount * totalOdds;
+          }
+
+          // Update bet slip
+          await this.updateBetSlip({
+            betSlipId: betSlipData.betSlip.betSlipId.toString(),
+            betSlipResult,
+            status: 'resolved',
+            actualWinnings,
+          });
+
+          // Update user stats
+          await this.usersService.updateStats({
+            address: betSlipData.betSlip.userAddress,
+            stats: {
+              totalWagered: betSlipData.betSlip.totalBetAmount,
+              totalWon: actualWinnings,
+              winCount: betSlipResult === 'won' ? 1 : 0,
+              lossCount: betSlipResult === 'lost' ? 1 : 0,
+            },
+          });
+
+          this.logger.debug(
+            `Updated bet slip ${betSlipData.betSlip.betSlipId}: ${betSlipResult} (winnings: ${actualWinnings})`,
+          );
+        }
+      }
     } catch (error: any) {
-      throw new HttpException(
-        `Error Updating Bet: ${error.message}`,
-        HttpStatus.BAD_GATEWAY,
-        {
-          cause: error.message,
-          description: error,
-        },
-      );
+      this.logger.error(`Error updating bet slip results: ${error.message}`);
     }
   }
 
-  async create(createBetDto: CreateBetDto): Promise<Bet> {
-    const {
-      betAmount,
-      betId,
-      matchId,
-      oddsAtPlacement,
-      selectedOutcome,
-      userAddress,
-    } = createBetDto;
+  async create(createBetDto: CreateBetDto): Promise<BetSlip> {
+    const { userAddress, betSlipId, totalBetAmount, selections } = createBetDto;
 
     try {
-      // First, check if the match exists and get its status
-      const fixture = await this.matchProvider.getSingleFixture(
-        matchId.toString(),
-      );
-
-      if (!fixture) {
-        throw new HttpException(
-          `Match with ID ${matchId} not found`,
-          HttpStatus.NOT_FOUND,
-        );
-      }
-
-      // Check if the match status is 'NS' (Not Started)
-      if (fixture.matchStats.status !== 'NS') {
-        throw new HttpException(
-          `Cannot place bet on match ${matchId}. Match status is ${fixture.matchStats.status}. Only matches with status 'NS' (Not Started) are allowed for betting.`,
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-
-      const bet = new this.betModel({
-        userAddress,
-        betAmount,
-        betId,
-        matchId,
-        oddsAtPlacement,
-        selectedOutcome,
-        placedAt: new Date(),
-        // betResult,
-        // isClaimed,
-        // matchResult,
-        // resolvedAt,
-        // txHash,
+      // checking is betSlipId is in Bet-Slip-Entity
+      const existingBet = await this.betSlipModel.findOne({
+        betSlipId: betSlipId,
       });
 
-      return bet.save();
+      if (existingBet) {
+        throw new HttpException(
+          `Bet with ID: ${betSlipId} already exist`,
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      // Calculate expected payment (multiply all odds together)
+      const totalOdds = this.calculateTotalOdds(selections);
+      const expectedPayment = totalBetAmount * totalOdds;
+
+      // Validate all matches exist and get team information
+      const selectionsWithTeamInfo = [];
+
+      for (const selection of selections) {
+        const fixture = await this.matchProvider.getSingleFixture(
+          selection.matchId.toString(),
+        );
+
+        if (!fixture) {
+          throw new HttpException(
+            `Match with ID ${selection.matchId} not found`,
+            HttpStatus.NOT_FOUND,
+          );
+        }
+
+        //  if (fixture.matchStats.status !== 'NS') {
+        //   throw new HttpException(
+        //     `Cannot place bet on match ${selection.matchId}. Match status is ${fixture.matchStats.status}. Only matches with status 'NS' (Not Started) are allowed for betting.`,
+        //     HttpStatus.BAD_REQUEST,
+        //   );
+        // }
+
+        // Extract team information from fixture
+        const homeTeam = fixture.homeTeam || 'Unknown Home Team';
+        const awayTeam = fixture.awayTeam || 'Unknown Away Team';
+        const matchStartTime = fixture.date || new Date();
+
+        selectionsWithTeamInfo.push({
+          ...selection,
+          homeTeam,
+          awayTeam,
+          matchStartTime: new Date(matchStartTime),
+        });
+      }
+
+      // Create bet slip
+      const betSlip = new this.betSlipModel({
+        userAddress,
+        betSlipId,
+        totalBetAmount,
+        expectedPayment,
+        totalOdds,
+        placedAt: new Date(),
+      });
+
+      const savedBetSlip = await betSlip.save();
+
+      // Create bet selections with team information
+      const betSelections = selectionsWithTeamInfo.map((selection) => ({
+        betSlipId: betSlip._id,
+        matchId: selection.matchId,
+        selectedOutcome: selection.selectedOutcome,
+        oddsAtPlacement: selection.oddsAtPlacement,
+        homeTeam: selection.homeTeam,
+        awayTeam: selection.awayTeam,
+        matchStartTime: selection.matchStartTime,
+      }));
+
+      await this.betSelectionModel.insertMany(betSelections);
+
+      return savedBetSlip;
     } catch (error: any) {
       if (error instanceof HttpException) {
         throw error;
       }
 
       throw new HttpException(
-        `Error Creating Bet: ${error.message}`,
+        `Error Creating Bet Slip: ${error.message}`,
         HttpStatus.BAD_GATEWAY,
         {
           cause: error.message,
@@ -215,32 +293,61 @@ export class BetsService {
     }
   }
 
-  async findAllUnresolvedBet(): Promise<Bet[]> {
-    const bets = await this.findAll();
-
-    const filteredBet = bets.filter((bet) => {
-      return bet.matchResult === 'pending';
-    });
-
-    return filteredBet;
-  }
-
-  async findAllResolvedBet(): Promise<Bet[]> {
-    const bets = await this.findAll();
-
-    const filteredBet = bets.filter((bet) => {
-      return bet.matchResult !== 'pending';
-    });
-
-    return filteredBet;
-  }
-
-  async findAll(): Promise<Bet[]> {
+  async updateBetSlip({
+    betSlipId,
+    betSlipResult,
+    status,
+    actualWinnings,
+    claimSignature,
+  }: {
+    betSlipId: string;
+    betSlipResult?: BetSlipResult;
+    status?: BetSlipStatus;
+    actualWinnings?: number;
+    claimSignature?: string;
+  }) {
     try {
-      return await this.betModel.find().exec();
+      const updateData: any = {};
+
+      if (betSlipResult !== undefined) {
+        updateData.betSlipResult = betSlipResult;
+      }
+
+      if (status !== undefined) {
+        updateData.status = status;
+        if (status === 'resolved') {
+          updateData.resolvedAt = new Date();
+        } else if (status === 'claimed') {
+          updateData.claimedAt = new Date();
+          updateData.isClaimed = true;
+        }
+      }
+
+      if (actualWinnings !== undefined) {
+        updateData.actualWinnings = actualWinnings;
+      }
+
+      if (claimSignature !== undefined) {
+        updateData.claimSignature = claimSignature;
+      }
+
+      const updatedBetSlip = await this.betSlipModel.findOneAndUpdate(
+        { betSlipId: parseInt(betSlipId) },
+        updateData,
+        { new: true },
+      );
+
+      if (!updatedBetSlip) {
+        throw new HttpException(
+          `Bet slip with ID ${betSlipId} not found`,
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      return updatedBetSlip;
     } catch (error: any) {
       throw new HttpException(
-        `Error Creating Bet: ${error.message}`,
+        `Error Updating Bet Slip: ${error.message}`,
         HttpStatus.BAD_GATEWAY,
         {
           cause: error.message,
@@ -250,23 +357,157 @@ export class BetsService {
     }
   }
 
-  async findByBetId(betId: number): Promise<Bet> {
+  async updateSelection({
+    betSlipId,
+    matchId,
+    selectionResult,
+    matchResult,
+  }: {
+    betSlipId: Types.ObjectId;
+    matchId: number;
+    selectionResult: SelectionResult;
+    matchResult: MatchResult;
+  }) {
     try {
-      const bet = await this.betModel.findOne({
-        betId: betId,
+      const updatedSelection = await this.betSelectionModel.findOneAndUpdate(
+        { betSlipId, matchId },
+        {
+          selectionResult,
+          matchResult,
+          resolvedAt: new Date(),
+        },
+        { new: true },
+      );
+
+      if (!updatedSelection) {
+        throw new HttpException(
+          `Selection with betSlipId ${betSlipId} and matchId ${matchId} not found`,
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      return updatedSelection;
+    } catch (error: any) {
+      throw new HttpException(
+        `Error Updating Selection: ${error.message}`,
+        HttpStatus.BAD_GATEWAY,
+        {
+          cause: error.message,
+          description: error,
+        },
+      );
+    }
+  }
+
+  async findAllPendingBetSlips(): Promise<BetSlipAndSelection[]> {
+    try {
+      const betSlips = await this.betSlipModel
+        .find({ status: 'pending' })
+        .exec();
+      const result: BetSlipAndSelection[] = [];
+
+      for (const betSlip of betSlips) {
+        const betSelections = await this.betSelectionModel.find({
+          betSlipId: betSlip._id,
+        });
+
+        result.push({
+          betSlip: betSlip,
+          betSelection: betSelections,
+        });
+      }
+
+      return result;
+    } catch (error: any) {
+      throw new HttpException(
+        `Error Finding Pending Bet Slips: ${error.message}`,
+        HttpStatus.BAD_GATEWAY,
+        {
+          cause: error.message,
+          description: error,
+        },
+      );
+    }
+  }
+
+  async findAllUnresolvedSelections(): Promise<BetSelection[]> {
+    try {
+      return await this.betSelectionModel
+        .find({ selectionResult: 'pending' })
+        .exec();
+    } catch (error: any) {
+      throw new HttpException(
+        `Error Finding Unresolved Selections: ${error.message}`,
+        HttpStatus.BAD_GATEWAY,
+        {
+          cause: error.message,
+          description: error,
+        },
+      );
+    }
+  }
+
+  async findSelectionsByBetSlipId(betSlipId: number): Promise<BetSelection[]> {
+    try {
+      return await this.betSelectionModel.find({ betSlipId }).exec();
+    } catch (error: any) {
+      throw new HttpException(
+        `Error Finding Selections: ${error.message}`,
+        HttpStatus.BAD_GATEWAY,
+        {
+          cause: error.message,
+          description: error,
+        },
+      );
+    }
+  }
+
+  async findAll(): Promise<BetSlipAndSelection[]> {
+    try {
+      const betSlips = await this.betSlipModel.find().exec();
+      const result: BetSlipAndSelection[] = [];
+
+      for (const betSlip of betSlips) {
+        const betSelections = await this.betSelectionModel.find({
+          betSlipId: betSlip._id,
+        });
+
+        result.push({
+          betSlip: betSlip,
+          betSelection: betSelections,
+        });
+      }
+
+      return result;
+    } catch (error: any) {
+      throw new HttpException(
+        `Error Finding Bet Slips: ${error.message}`,
+        HttpStatus.BAD_GATEWAY,
+        {
+          cause: error.message,
+          description: error,
+        },
+      );
+    }
+  }
+
+  async findByBetSlipId(betSlipId: number): Promise<BetSlip> {
+    try {
+      const betSlip = await this.betSlipModel.findOne({
+        betSlipId: betSlipId,
       });
 
-      if (!bet) {
+      if (!betSlip) {
         throw new HttpException(
-          `Cant find bet based on ${betId}`,
+          `Can't find bet slip based on ${betSlipId}`,
           HttpStatus.BAD_GATEWAY,
         );
       }
 
-      return bet;
+      return betSlip;
     } catch (error: any) {
       throw new HttpException(
-        `Error Finding Bet: ${error.message}`,
+        `Error Finding Bet Slip: ${error.message}`,
         HttpStatus.BAD_GATEWAY,
         {
           cause: error.message,
@@ -276,16 +517,97 @@ export class BetsService {
     }
   }
 
-  async findUserBets(userAddress: string): Promise<Bet[]> {
+  async findUserBetSlips(userAddress: string): Promise<BetSlipAndSelection[]> {
     try {
-      const bets = await this.betModel.find({
+      const betSlips = await this.betSlipModel.find({
         userAddress: userAddress,
       });
+      const result: BetSlipAndSelection[] = [];
 
-      return bets;
+      for (const betSlip of betSlips) {
+        const betSelections = await this.betSelectionModel.find({
+          betSlipId: betSlip._id,
+        });
+
+        result.push({
+          betSlip: betSlip,
+          betSelection: betSelections,
+        });
+      }
+
+      return result;
     } catch (error: any) {
       throw new HttpException(
-        `Error Finding Bet: ${error.message}`,
+        `Error Finding User Bet Slips: ${error.message}`,
+        HttpStatus.BAD_GATEWAY,
+        {
+          cause: error.message,
+          description: error,
+        },
+      );
+    }
+  }
+
+  async addClaimSignature({
+    betSlipId,
+    signature,
+  }: {
+    betSlipId: string;
+    signature: string;
+  }) {
+    try {
+      const updatedBetSlip = await this.betSlipModel.findOneAndUpdate(
+        { betSlipId: parseInt(betSlipId) },
+        {
+          claimSignature: signature,
+        },
+        { new: true },
+      );
+
+      if (!updatedBetSlip) {
+        throw new HttpException(
+          `Bet slip with ID ${betSlipId} not found`,
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      return updatedBetSlip;
+    } catch (error: any) {
+      throw new HttpException(
+        `Error Adding ClaimSignature to Bet Slip: ${error.message}`,
+        HttpStatus.BAD_GATEWAY,
+        {
+          cause: error.message,
+          description: error,
+        },
+      );
+    }
+  }
+
+  async markBetSlipAsClaimed({ betSlipId }: { betSlipId: string }) {
+    try {
+      const updatedBetSlip = await this.betSlipModel.findOneAndUpdate(
+        { betSlipId: parseInt(betSlipId) },
+        {
+          claimSignature: '',
+          isClaimed: true,
+          status: 'claimed',
+          claimedAt: new Date(),
+        },
+        { new: true },
+      );
+
+      if (!updatedBetSlip) {
+        throw new HttpException(
+          `Bet slip with ID ${betSlipId} not found`,
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      return updatedBetSlip;
+    } catch (error: any) {
+      throw new HttpException(
+        `Error Claiming Bet Slip: ${error.message}`,
         HttpStatus.BAD_GATEWAY,
         {
           cause: error.message,

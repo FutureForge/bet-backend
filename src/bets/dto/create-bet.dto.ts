@@ -1,6 +1,41 @@
-import { IsString, IsNotEmpty, IsNumber, IsIn } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsNumber,
+  IsIn,
+  IsArray,
+  ValidateNested,
+  ArrayMinSize,
+} from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
+
+export class BetSelectionDto {
+  @ApiProperty({
+    description: 'ID of the match/fixture',
+    example: 12345,
+  })
+  @IsNumber()
+  @IsNotEmpty()
+  matchId: number;
+
+  @ApiProperty({
+    description: 'Selected outcome for this match',
+    enum: ['home', 'draw', 'away'],
+    example: 'home',
+  })
+  @IsString()
+  @IsIn(['home', 'draw', 'away'])
+  selectedOutcome: 'home' | 'draw' | 'away';
+
+  @ApiProperty({
+    description: 'Odds at the time of bet placement for this match',
+    example: 2.5,
+  })
+  @IsNumber()
+  @Type(() => Number)
+  oddsAtPlacement: number;
+}
 
 export class CreateBetDto {
   @ApiProperty({
@@ -12,43 +47,40 @@ export class CreateBetDto {
   userAddress: string;
 
   @ApiProperty({
-    description: 'ID of the match to bet on',
-    example: '12345',
+    description: 'Unique ID of the bet slip',
+    example: 12345,
   })
   @IsNumber()
   @IsNotEmpty()
-  matchId: number;
+  betSlipId: number;
 
   @ApiProperty({
-    description: 'ID of the bet',
-    example: '12345',
-  })
-  @IsNumber()
-  @IsNotEmpty()
-  betId: number;
-
-  @ApiProperty({
-    description: 'Bet amount in XFI or token decimals',
+    description: 'Total bet amount in XFI or token decimals',
     example: 100.5,
   })
   @IsNumber()
   @Type(() => Number)
-  betAmount: number;
+  totalBetAmount: number;
 
   @ApiProperty({
-    description: 'Selected outcome for the bet',
-    enum: ['home', 'draw', 'away'],
-    example: 'home',
+    description: 'Array of bet selections (matches)',
+    type: [BetSelectionDto],
+    example: [
+      {
+        matchId: 12345,
+        selectedOutcome: 'home',
+        oddsAtPlacement: 2.5,
+      },
+      {
+        matchId: 12346,
+        selectedOutcome: 'away',
+        oddsAtPlacement: 1.8,
+      },
+    ],
   })
-  @IsString()
-  @IsIn(['home', 'draw', 'away'])
-  selectedOutcome: 'home' | 'draw' | 'away';
-
-  @ApiProperty({
-    description: 'Odds at the time of bet placement for fixed payout logic',
-    example: 2.5,
-  })
-  @IsNumber()
-  @Type(() => Number)
-  oddsAtPlacement: number;
+  @IsArray()
+  @ArrayMinSize(1, { message: 'At least one selection is required' })
+  @ValidateNested({ each: true })
+  @Type(() => BetSelectionDto)
+  selections: BetSelectionDto[];
 }
