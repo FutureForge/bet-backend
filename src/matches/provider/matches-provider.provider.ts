@@ -104,7 +104,7 @@ export class MatchesProvider {
         isHomeWinner: fixture.teams.home.winner,
         isAwayWinner: fixture.teams.away.winner,
       },
-      prediction: fixturePrediction,
+      prediction: fixturePrediction || undefined,
     };
 
     // Cache the result with appropriate TTL
@@ -170,9 +170,10 @@ export class MatchesProvider {
               id: country.id,
               name: country.name,
               code: country.code,
+              flag: country.flag,
             },
             widget: this.fixtureWidget(fixture.fixture.id.toString()),
-            prediction: fixturePrediction,
+            prediction: fixturePrediction || undefined,
             matchStats: {
               status: fixture.fixture.status.short as MatchStatsStatus,
               isHomeWinner: fixture.teams.home.winner,
@@ -193,7 +194,9 @@ export class MatchesProvider {
           flag: country.flag,
           tableWidget: this.leagueWidget({ league: country.id }),
         },
-        fixtures: fixturesWithCountry,
+        fixtures: fixturesWithCountry.filter((fixture) => {
+          return fixture.matchStats.status === 'NS';
+        })
       };
 
       groupedFixtures.push(countryFixtures);
@@ -202,34 +205,118 @@ export class MatchesProvider {
     return groupedFixtures;
   }
 
-  private async getPrediction(fixtureId: number): Promise<FormattedPrediction> {
-    const endpoint = `predictions?fixture=${fixtureId}`;
+  public async getDummyFixtures(): Promise<Fixture[]> {
+    const today = new Date();
+    const date = today.toISOString().split('T')[0];
 
-    const fixturePrediction =
-      await this.callFootballAPI<PredictionAPIResponse>(endpoint);
+    const endpoint = `fixtures?date=${date}`;
 
-    const predictionResponse = fixturePrediction.response[0];
+    const fixtures = await this.callFootballAPI<FixtureAPIResponse>(endpoint);
 
-    const odds = generateOdds(
-      predictionResponse.predictions.percent,
-      predictionResponse.comparison,
+    if (fixtures.errors.length !== 0) {
+      throw new HttpException(
+        `Error fetching fixtures`,
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+
+    const fixturesResponse = fixtures.response;
+
+    const fixturesWithCountry = await Promise.all(
+      fixturesResponse.map(async (fixture) => {
+        const fixturePrediction = await this.getPrediction(fixture.fixture.id);
+
+        const formattedFixtures = {
+          id: fixture.fixture.id,
+          date: fixture.fixture.date,
+          time: convertTimestampToTime(
+            fixture.fixture.timestamp,
+            fixture.fixture.timezone,
+          ),
+          timezone: fixture.fixture.timezone,
+          venue: fixture.fixture.venue.name,
+          leagueCountry: fixture.league.country,
+          leagueName: fixture.league.name,
+          leagueLogo: fixture.league.logo,
+          leagueFlag: fixture.league.flag,
+          matchDay: fixture.league.round,
+          homeTeamId: fixture.teams.home.id,
+          homeTeam: fixture.teams.home.name,
+          homeTeamLogo: fixture.teams.home.logo,
+          awayTeamId: fixture.teams.away.id,
+          awayTeam: fixture.teams.away.name,
+          awayTeamLogo: fixture.teams.away.logo,
+          country: {
+            id: fixture.league.id,
+            name: fixture.league.name,
+            code: fixture.league.country,
+            flag: fixture.league.flag,
+          },
+          widget: this.fixtureWidget(fixture.fixture.id.toString()),
+          prediction: fixturePrediction || undefined,
+          matchStats: {
+            status: fixture.fixture.status.short as MatchStatsStatus,
+            isHomeWinner: fixture.teams.home.winner,
+            isAwayWinner: fixture.teams.away.winner,
+          },
+        };
+
+        return formattedFixtures;
+      }),
     );
 
-    const formattedPrediction: FormattedPrediction = {
-      homePercent: predictionResponse.predictions.percent.home,
-      awayPercent: predictionResponse.predictions.percent.away,
-      drawPercent: predictionResponse.predictions.percent.draw,
-      advice: predictionResponse.predictions.advice,
-      h2hHome: predictionResponse.comparison.h2h.home,
-      h2hAway: predictionResponse.comparison.h2h.away,
-      h2hGoalsHome: predictionResponse.comparison.goals.home,
-      h2hGoalsAway: predictionResponse.comparison.goals.away,
-      h2hTotalHome: predictionResponse.comparison.total.home,
-      h2hTotalAway: predictionResponse.comparison.total.away,
-      odds,
-    };
+    return fixturesWithCountry
+      .filter((fixture) => {
+        return fixture.matchStats.status === 'NS';
+      })
+      .slice(0, 30);
+  }
 
-    return formattedPrediction;
+  private async getPrediction(fixtureId: number): Promise<FormattedPrediction | null> {
+    try {
+      const endpoint = `predictions?fixture=${fixtureId}`;
+
+      const fixturePrediction =
+        await this.callFootballAPI<PredictionAPIResponse>(endpoint);
+
+      // Check if response exists and has data
+      if (!fixturePrediction.response || fixturePrediction.response.length === 0) {
+        this.logger.warn(`No prediction data available for fixture ${fixtureId}`);
+        return null;
+      }
+
+      const predictionResponse = fixturePrediction.response[0];
+
+      // Check if predictionResponse has the required properties
+      if (!predictionResponse || !predictionResponse.predictions || !predictionResponse.comparison) {
+        this.logger.warn(`Invalid prediction data structure for fixture ${fixtureId}`);
+        return null;
+      }
+
+      const odds = generateOdds(
+        predictionResponse.predictions.percent,
+        predictionResponse.comparison,
+      );
+
+      const formattedPrediction: FormattedPrediction = {
+        homePercent: predictionResponse.predictions.percent.home,
+        awayPercent: predictionResponse.predictions.percent.away,
+        drawPercent: predictionResponse.predictions.percent.draw,
+        advice: predictionResponse.predictions.advice,
+        h2hHome: predictionResponse.comparison.h2h.home,
+        h2hAway: predictionResponse.comparison.h2h.away,
+        h2hGoalsHome: predictionResponse.comparison.goals.home,
+        h2hGoalsAway: predictionResponse.comparison.goals.away,
+        h2hTotalHome: predictionResponse.comparison.total.home,
+        h2hTotalAway: predictionResponse.comparison.total.away,
+        odds,
+      };
+
+      return formattedPrediction;
+    } catch (error) {
+      this.logger.error(`Failed to get prediction for fixture ${fixtureId}: ${error.message}`);
+      return null;
+    }
   }
 
   private leagueWidget({ league }: { league: number }): string {
@@ -310,7 +397,8 @@ export class MatchesProvider {
    * Get fixture from cache if it exists and is not expired
    */
   private getFromCache(fixtureId: string): Fixture | null {
-    const cacheEntry = this.fixtureCache.get(fixtureId);
+    const cacheKey = `matches:fixture:${fixtureId}`;
+    const cacheEntry = this.fixtureCache.get(cacheKey);
 
     if (!cacheEntry) {
       return null;
@@ -319,7 +407,7 @@ export class MatchesProvider {
     const now = Date.now();
     if (now - cacheEntry.timestamp > cacheEntry.ttl) {
       // Cache entry expired, remove it
-      this.fixtureCache.delete(fixtureId);
+      this.fixtureCache.delete(cacheKey);
       return null;
     }
 
@@ -369,7 +457,9 @@ export class MatchesProvider {
         ttl = this.CACHE_TTL_DEFAULT;
     }
 
-    this.fixtureCache.set(fixtureId, {
+    // Use namespaced key for better organization
+    const cacheKey = `matches:fixture:${fixtureId}`;
+    this.fixtureCache.set(cacheKey, {
       data: fixture,
       timestamp: now,
       ttl,
@@ -400,7 +490,8 @@ export class MatchesProvider {
    * Force refresh a specific fixture in cache
    */
   public invalidateFixtureCache(fixtureId: string): void {
-    this.fixtureCache.delete(fixtureId);
+    const cacheKey = `matches:fixture:${fixtureId}`;
+    this.fixtureCache.delete(cacheKey);
   }
 
   /**
@@ -416,7 +507,9 @@ export class MatchesProvider {
   public getCacheStats(): { size: number; entries: string[] } {
     return {
       size: this.fixtureCache.size,
-      entries: Array.from(this.fixtureCache.keys()),
+      entries: Array.from(this.fixtureCache.keys()).map(key => 
+        key.replace('matches:fixture:', '') // Remove namespace for cleaner display
+      ),
     };
   }
 
@@ -436,7 +529,9 @@ export class MatchesProvider {
 
     return {
       size: this.fixtureCache.size,
-      entries: Array.from(this.fixtureCache.keys()),
+      entries: Array.from(this.fixtureCache.keys()).map(key => 
+        key.replace('matches:fixture:', '') // Remove namespace for cleaner display
+      ),
       totalMemoryUsage: JSON.stringify(Array.from(this.fixtureCache.values()))
         .length,
       averageEntrySize:

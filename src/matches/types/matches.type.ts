@@ -97,11 +97,7 @@ export type Fixture = {
   awayTeam: string;
   awayTeamLogo: string;
   widget: string;
-  country?: {
-    id: number;
-    name: string;
-    code: string;
-  };
+  country?: Country;
   prediction?: FormattedPrediction;
   matchStats: {
     status: MatchStatsStatus;

@@ -20,6 +20,11 @@ export class MatchesController {
     return this.matchesService.getAllFixtures();
   }
 
+  @Get('/dummy')
+  dummyFixtures() {
+    return this.matchesService.getDummyFixtures();
+  }
+
   @Get(':fixtureId')
   singleFixture(@Param('fixtureId') fixtureId: string) {
     return this.matchesService.getSingleFixture(fixtureId);

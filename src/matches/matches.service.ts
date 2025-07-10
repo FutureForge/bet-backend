@@ -9,7 +9,8 @@ import { Cache } from 'cache-manager';
 @Injectable()
 export class MatchesService {
   private readonly logger = new Logger(MatchesService.name);
-  private readonly CACHE_KEY = 'fixtures';
+  private readonly CACHE_KEY_FIXTURES = 'matches:fixtures:grouped';
+  private readonly CACHE_KEY_DUMMY_FIXTURES = 'matches:fixtures:dummy';
   private readonly CACHE_TTL = 3600000; // 1 hour in milliseconds
 
   constructor(
@@ -22,7 +23,7 @@ export class MatchesService {
     this.logger.debug('Fetching matches data every hour');
     try {
       const fixtures = await this.matchesProvider.getFixtures();
-      await this.cacheManager.set(this.CACHE_KEY, fixtures, this.CACHE_TTL);
+      await this.cacheManager.set(this.CACHE_KEY_FIXTURES, fixtures, this.CACHE_TTL);
       this.logger.debug(`Cached ${fixtures.length} country groups for 1 hour`);
     } catch (error) {
       this.logger.error('Failed to fetch and cache matches data:', error);
@@ -30,16 +31,46 @@ export class MatchesService {
   }
 
   async getAllFixtures(): Promise<GroupedFixturesResponse> {
-    let fixtures = await this.cacheManager.get<GroupedFixturesResponse>(this.CACHE_KEY);
+    let fixtures = await this.cacheManager.get<GroupedFixturesResponse>(
+      this.CACHE_KEY_FIXTURES,
+    );
 
     if (!fixtures) {
       this.logger.debug('Cache miss, fetching fresh data');
       try {
         fixtures = await this.matchesProvider.getFixtures();
-        await this.cacheManager.set(this.CACHE_KEY, fixtures, this.CACHE_TTL);
-        this.logger.debug(`Cached ${fixtures.length} country groups for 1 hour`);
+        await this.cacheManager.set(this.CACHE_KEY_FIXTURES, fixtures, this.CACHE_TTL);
+        this.logger.debug(
+          `Cached ${fixtures.length} country groups for 1 hour`,
+        );
       } catch (error) {
         this.logger.error('Failed to fetch fixtures data:', error);
+        throw error;
+      }
+    } else {
+      this.logger.debug('Cache hit, returning cached data');
+    }
+
+    return fixtures;
+  }
+
+  async getDummyFixtures(): Promise<Fixture[]> {
+    let fixtures = await this.cacheManager.get<Fixture[]>(this.CACHE_KEY_DUMMY_FIXTURES);
+
+    if (!fixtures) {
+      this.logger.debug('Cache miss, fetching fresh dummy data');
+      try {
+        fixtures = await this.matchesProvider.getDummyFixtures();
+        await this.cacheManager.set(
+          this.CACHE_KEY_DUMMY_FIXTURES,
+          fixtures,
+          this.CACHE_TTL,
+        );
+        this.logger.debug(
+          `Cached ${fixtures.length} dummy fixtures for 1 hour`,
+        );
+      } catch (error) {
+        this.logger.error('Failed to fetch dummy fixtures data:', error);
         throw error;
       }
     } else {
@@ -55,7 +86,8 @@ export class MatchesService {
   }
 
   async clearFixturesCache(): Promise<void> {
-    await this.cacheManager.del(this.CACHE_KEY);
+    await this.cacheManager.del(this.CACHE_KEY_FIXTURES);
+    await this.cacheManager.del(this.CACHE_KEY_DUMMY_FIXTURES);
     // Clear individual fixture cache as well
     this.matchesProvider.clearAllFixtureCache();
     this.logger.debug('All fixtures cache cleared');
@@ -72,6 +104,11 @@ export class MatchesService {
       key: string;
       ttl: number;
     };
+    dummyFixturesCache: {
+      cached: boolean;
+      key: string;
+      ttl: number;
+    };
     individualFixturesCache: {
       size: number;
       entries: string[];
@@ -81,13 +118,23 @@ export class MatchesService {
       newestEntry: number | null;
     };
   }> {
-    const fixtures = await this.cacheManager.get<GroupedFixturesResponse>(this.CACHE_KEY);
+    const fixtures = await this.cacheManager.get<GroupedFixturesResponse>(
+      this.CACHE_KEY_FIXTURES,
+    );
+    const dummyFixtures = await this.cacheManager.get<Fixture[]>(
+      this.CACHE_KEY_DUMMY_FIXTURES,
+    );
     const fixtureCacheStats = this.matchesProvider.getDetailedCacheStats();
-    
+
     return {
       fixturesListCache: {
         cached: !!fixtures,
-        key: this.CACHE_KEY,
+        key: this.CACHE_KEY_FIXTURES,
+        ttl: this.CACHE_TTL,
+      },
+      dummyFixturesCache: {
+        cached: !!dummyFixtures,
+        key: this.CACHE_KEY_DUMMY_FIXTURES,
         ttl: this.CACHE_TTL,
       },
       individualFixturesCache: fixtureCacheStats,
