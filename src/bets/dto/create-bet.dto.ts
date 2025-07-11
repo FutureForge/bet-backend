@@ -9,6 +9,7 @@ import {
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
+import { Blockchain } from '../types/bet.types';
 
 export class BetSelectionDto {
   @ApiProperty({
@@ -45,6 +46,15 @@ export class CreateBetDto {
   @IsString()
   @IsNotEmpty()
   userAddress: string;
+
+  @ApiProperty({
+    description: 'Blockchain where the bet is being placed',
+    enum: ['crossfi', 'bnb'],
+    example: 'crossfi',
+  })
+  @IsString()
+  @IsIn(['crossfi', 'bnb'])
+  blockchain: Blockchain;
 
   @ApiProperty({
     description: 'Unique ID of the bet slip',

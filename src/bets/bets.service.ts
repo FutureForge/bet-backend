@@ -18,7 +18,8 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { MatchesService } from 'src/matches/matches.service';
 import { MatchesProvider } from 'src/matches/provider/matches-provider.provider';
 import { UsersService } from 'src/users/users.service';
-import { BetSlipAndSelection } from './types/bet.types';
+import { BlockchainService } from './services/blockchain.service';
+import { BetSlipAndSelection, Blockchain } from './types/bet.types';
 
 @Injectable()
 export class BetsService {
@@ -34,6 +35,8 @@ export class BetsService {
     private matchProvider: MatchesProvider,
 
     private usersService: UsersService,
+
+    private blockchainService: BlockchainService,
   ) {}
 
   /**
@@ -197,9 +200,25 @@ export class BetsService {
   }
 
   async create(createBetDto: CreateBetDto): Promise<BetSlipAndSelection> {
-    const { userAddress, betSlipId, totalBetAmount, selections } = createBetDto;
+    const { userAddress, betSlipId, totalBetAmount, selections, blockchain } = createBetDto;
 
     try {
+      // Validate blockchain
+      if (!this.blockchainService.isSupportedBlockchain(blockchain)) {
+        throw new HttpException(
+          `Unsupported blockchain: ${blockchain}`,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Validate wallet address for the specific blockchain
+      if (!this.blockchainService.validateWalletAddress(userAddress, blockchain)) {
+        throw new HttpException(
+          `Invalid wallet address for blockchain ${blockchain}`,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
       // checking is betSlipId is in Bet-Slip-Entity
       const existingBet = await this.betSlipModel.findOne({
         betSlipId: betSlipId,
@@ -258,6 +277,7 @@ export class BetsService {
         totalBetAmount,
         expectedPayment,
         totalOdds,
+        blockchain,
         placedAt: new Date(),
       });
 
@@ -599,6 +619,70 @@ export class BetsService {
     } catch (error: any) {
       throw new HttpException(
         `Error Finding User Claimed Winnings: ${error.message}`,
+        HttpStatus.BAD_GATEWAY,
+        {
+          cause: error.message,
+          description: error,
+        },
+      );
+    }
+  }
+
+  async findBetSlipsByBlockchain(blockchain: Blockchain): Promise<BetSlipAndSelection[]> {
+    try {
+      const betSlips = await this.betSlipModel.find({ blockchain }).exec();
+      const result: BetSlipAndSelection[] = [];
+
+      for (const betSlip of betSlips) {
+        const betSelections = await this.betSelectionModel.find({
+          betSlipId: betSlip._id,
+        });
+
+        result.push({
+          betSlip: betSlip,
+          betSelection: betSelections,
+        });
+      }
+
+      return result;
+    } catch (error: any) {
+      throw new HttpException(
+        `Error Finding Bet Slips by Blockchain: ${error.message}`,
+        HttpStatus.BAD_GATEWAY,
+        {
+          cause: error.message,
+          description: error,
+        },
+      );
+    }
+  }
+
+  async findUserBetSlipsByBlockchain(
+    userAddress: string,
+    blockchain: Blockchain,
+  ): Promise<BetSlipAndSelection[]> {
+    try {
+      const betSlips = await this.betSlipModel.find({
+        userAddress: userAddress,
+        blockchain: blockchain,
+      });
+      const result: BetSlipAndSelection[] = [];
+
+      for (const betSlip of betSlips) {
+        const betSelections = await this.betSelectionModel.find({
+          betSlipId: betSlip._id,
+        });
+
+        result.push({
+          betSlip: betSlip,
+          betSelection: betSelections,
+        });
+      }
+
+      return result;
+    } catch (error: any) {
+      throw new HttpException(
+        `Error Finding User Bet Slips by Blockchain: ${error.message}`,
         HttpStatus.BAD_GATEWAY,
         {
           cause: error.message,

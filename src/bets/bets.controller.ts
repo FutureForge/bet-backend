@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { BetsService } from './bets.service';
+import { BlockchainService } from './services/blockchain.service';
 import { CreateBetDto } from './dto/create-bet.dto';
 import { UpdateBetSlipDto } from './dto/update-bet-slip.dto';
 import {
@@ -19,12 +20,15 @@ import {
 } from './dto/bet-slip-response.dto';
 import { BetSlip } from './entities/bet-slip.entity';
 import { BetSelection } from './entities/bet-selection.entity';
-import { BetSlipAndSelection } from './types/bet.types';
+import { BetSlipAndSelection, Blockchain } from './types/bet.types';
 
 @ApiTags('bets')
 @Controller('bets')
 export class BetsController {
-  constructor(private readonly betsService: BetsService) {}
+  constructor(
+    private readonly betsService: BetsService,
+    private readonly blockchainService: BlockchainService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new bet slip with multiple selections' })
@@ -127,6 +131,61 @@ export class BetsController {
     @Param('userAddress') userAddress: string,
   ): Promise<BetSlipAndSelection[]> {
     return await this.betsService.findUserClaimedWinnings(userAddress);
+  }
+
+  @Get('/blockchain/:blockchain')
+  @ApiOperation({ summary: 'Get all bet slips by blockchain' })
+  @ApiParam({ name: 'blockchain', description: 'Blockchain name (crossfi or bnb)', enum: ['crossfi', 'bnb'] })
+  @ApiResponse({
+    status: 200,
+    description: 'List of bet slips for the specified blockchain',
+    type: [BetSlipAndSelectionResponseDto],
+  })
+  async findBetSlipsByBlockchain(
+    @Param('blockchain') blockchain: Blockchain,
+  ): Promise<BetSlipAndSelection[]> {
+    return await this.betsService.findBetSlipsByBlockchain(blockchain);
+  }
+
+  @Get('/user/:userAddress/blockchain/:blockchain')
+  @ApiOperation({ summary: 'Get user bet slips by blockchain' })
+  @ApiParam({ name: 'userAddress', description: 'User wallet address' })
+  @ApiParam({ name: 'blockchain', description: 'Blockchain name (crossfi or bnb)', enum: ['crossfi', 'bnb'] })
+  @ApiResponse({
+    status: 200,
+    description: 'User bet slips for the specified blockchain found',
+    type: [BetSlipAndSelectionResponseDto],
+  })
+  async findUserBetSlipsByBlockchain(
+    @Param('userAddress') userAddress: string,
+    @Param('blockchain') blockchain: Blockchain,
+  ): Promise<BetSlipAndSelection[]> {
+    return await this.betsService.findUserBetSlipsByBlockchain(userAddress, blockchain);
+  }
+
+  @Get('/blockchains')
+  @ApiOperation({ summary: 'Get all supported blockchains' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of supported blockchains',
+  })
+  async getSupportedBlockchains() {
+    const blockchains = this.blockchainService.getSupportedBlockchains();
+    return {
+      blockchains: blockchains.map(chain => this.blockchainService.getBlockchainInfo(chain)),
+      defaultChain: this.blockchainService.getDefaultBlockchain(),
+    };
+  }
+
+  @Get('/blockchains/:blockchain')
+  @ApiOperation({ summary: 'Get blockchain information' })
+  @ApiParam({ name: 'blockchain', description: 'Blockchain name (crossfi or bnb)', enum: ['crossfi', 'bnb'] })
+  @ApiResponse({
+    status: 200,
+    description: 'Blockchain information',
+  })
+  async getBlockchainInfo(@Param('blockchain') blockchain: Blockchain) {
+    return this.blockchainService.getBlockchainInfo(blockchain);
   }
 
   @Patch(':id')

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BetsService } from './bets.service';
 import { BetsController } from './bets.controller';
+import { BlockchainService } from './services/blockchain.service';
 import { MongooseModule } from '@nestjs/mongoose';
 import { BetSlip, BetSlipSchema } from './entities/bet-slip.entity';
 import {
@@ -12,7 +13,7 @@ import { UsersModule } from 'src/users/users.module';
 
 @Module({
   controllers: [BetsController],
-  providers: [BetsService, MatchesProvider],
+  providers: [BetsService, BlockchainService, MatchesProvider],
   imports: [
     MongooseModule.forFeature([
       {

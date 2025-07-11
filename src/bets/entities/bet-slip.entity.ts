@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, HydratedDocument, Types } from 'mongoose';
 import { ApiProperty } from '@nestjs/swagger';
+import { Blockchain } from '../types/bet.types';
 
 export type BetSlipResult = 'pending' | 'won' | 'lost';
 export type BetSlipStatus = 'pending' | 'resolved' | 'claimed';
@@ -16,6 +17,18 @@ export class BetSlip {
     required: true,
   })
   userAddress: string;
+
+  @ApiProperty({
+    description: 'Blockchain where the bet was placed',
+    enum: ['crossfi', 'bnb'],
+    example: 'crossfi',
+  })
+  @Prop({
+    type: String,
+    enum: ['crossfi', 'bnb'],
+    required: true,
+  })
+  blockchain: Blockchain;
 
   @ApiProperty({
     description: 'Unique ID of the bet slip',

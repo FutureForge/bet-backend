@@ -13,6 +13,12 @@ export default Joi.object({
   REDIS_PORT: Joi.number().required(),
   SPORT_API_URL: Joi.string().required(),
   SPORT_API_KEY: Joi.string().required(),
+  // Blockchain configuration
+  CROSSFI_RPC_URL: Joi.string().optional(),
+  CROSSFI_CONTRACT_ADDRESS: Joi.string().optional(),
+  BNB_RPC_URL: Joi.string().optional(),
+  BNB_CONTRACT_ADDRESS: Joi.string().optional(),
+  DEFAULT_BLOCKCHAIN: Joi.string().valid('crossfi', 'bnb').default('crossfi'),
   // CLOUDINARY_NAME: Joi.string().required(),
   // CLOUDINARY_API_KEY: Joi.string().required(),
   // CLOUDINARY_API_SECRET: Joi.string().required(),

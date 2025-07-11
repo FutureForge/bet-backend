@@ -4,6 +4,7 @@ import { AppService } from './app.service';
 import { LoggingMiddleware } from './middleware/logging.middleware';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import databaseConfig from './config/database.config';
+import blockchainConfig from './config/blockchain.config';
 import environmentValidation from './config/environmentValidation';
 import { MongooseModule } from '@nestjs/mongoose';
 import { CacheModule } from '@nestjs/cache-manager';
@@ -16,7 +17,7 @@ import { UsersModule } from './users/users.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [databaseConfig],
+      load: [databaseConfig, blockchainConfig],
       validationSchema: environmentValidation,
     }),
 
