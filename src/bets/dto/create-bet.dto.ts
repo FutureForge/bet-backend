@@ -45,6 +45,7 @@ export class CreateBetDto {
   })
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => value.toLowerCase())
   userAddress: string;
 
   @ApiProperty({

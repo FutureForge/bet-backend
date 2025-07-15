@@ -1,4 +1,10 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { CreateBetDto, BetSelectionDto } from './dto/create-bet.dto';
 import { UpdateBetSlipDto } from './dto/update-bet-slip.dto';
 import { UpdateSelectionDto } from './dto/update-selection.dto';
@@ -20,12 +26,18 @@ import { MatchesProvider } from 'src/matches/provider/matches-provider.provider'
 import { UsersService } from 'src/users/users.service';
 import { BlockchainService } from './services/blockchain.service';
 import { BetSlipAndSelection, Blockchain } from './types/bet.types';
+import blockchainConfig from 'src/config/blockchain.config';
+import { ConfigType } from '@nestjs/config';
+import { ethers } from 'ethers';
 
 @Injectable()
 export class BetsService {
   private readonly logger = new Logger(BetsService.name);
 
   constructor(
+    @Inject(blockchainConfig.KEY)
+    private blockchainConfiguration: ConfigType<typeof blockchainConfig>,
+
     @InjectModel(BetSlip.name)
     private readonly betSlipModel: Model<BetSlip>,
 
@@ -52,8 +64,38 @@ export class BetsService {
     }, 1);
   }
 
-  // @Cron(CronExpression.EVERY_10_SECONDS)
-  @Cron('0 */15 * * * *')
+  /**
+   * Generate blockchain signature for winning bet slips
+   */
+  private async generateClaimSignature(betSlip: BetSlip): Promise<string> {
+    const privateKey = this.blockchainConfiguration.adminPrivateKey;
+    const wallet = new ethers.Wallet(privateKey);
+
+    const reward = ethers.parseEther(betSlip.actualWinnings.toString());
+    const betId = betSlip.betSlipId;
+    const userAddress = betSlip.userAddress;
+
+    const messageHash = ethers.solidityPackedKeccak256(
+      ['address', 'uint256', 'uint256'],
+      [userAddress, betId, reward],
+    );
+
+    // const ethSignedMessageHash = ethers.hashMessage(
+    //   ethers.getBytes(messageHash),
+    // );
+    // const signerAddress = ethers.verifyMessage(ethers.getBytes(messageHash), signature);
+
+    const signature = await wallet.signMessage(ethers.getBytes(messageHash));
+
+    this.logger.debug(
+      `Signature for betId ${betId} of reward: ${betSlip.actualWinnings} for user ${userAddress} generated = `,
+      signature,
+    );
+    return signature;
+  }
+
+  @Cron(CronExpression.EVERY_10_SECONDS)
+  // @Cron('0 */15 * * * *')
   async handleBetResolutions() {
     this.logger.debug('Updating bet slip data every 15 minutes');
     try {
@@ -192,6 +234,21 @@ export class BetsService {
           this.logger.debug(
             `Updated bet slip ${betSlipData.betSlip.betSlipId}: ${betSlipResult} (winnings: ${actualWinnings})`,
           );
+
+          // Generate signature only for winning bet slips
+          if (betSlipResult === 'won') {
+            const signature = await this.generateClaimSignature(
+              betSlipData.betSlip,
+            );
+
+            await this.betSlipModel.findOneAndUpdate(
+              { betSlipId: betSlipData.betSlip.betSlipId },
+              { claimSignature: signature },
+              { new: true },
+            );
+
+            this.logger.debug(`Claim signature added to betslip`);
+          }
         }
       }
     } catch (error: any) {
@@ -200,7 +257,8 @@ export class BetsService {
   }
 
   async create(createBetDto: CreateBetDto): Promise<BetSlipAndSelection> {
-    const { userAddress, betSlipId, totalBetAmount, selections, blockchain } = createBetDto;
+    const { userAddress, betSlipId, totalBetAmount, selections, blockchain } =
+      createBetDto;
 
     try {
       // Validate blockchain
@@ -212,7 +270,9 @@ export class BetsService {
       }
 
       // Validate wallet address for the specific blockchain
-      if (!this.blockchainService.validateWalletAddress(userAddress, blockchain)) {
+      if (
+        !this.blockchainService.validateWalletAddress(userAddress, blockchain)
+      ) {
         throw new HttpException(
           `Invalid wallet address for blockchain ${blockchain}`,
           HttpStatus.BAD_REQUEST,
@@ -322,13 +382,11 @@ export class BetsService {
     betSlipResult,
     status,
     actualWinnings,
-    claimSignature,
   }: {
     betSlipId: string;
-    betSlipResult?: BetSlipResult;
-    status?: BetSlipStatus;
-    actualWinnings?: number;
-    claimSignature?: string;
+    betSlipResult: BetSlipResult;
+    status: BetSlipStatus;
+    actualWinnings: number;
   }) {
     try {
       const updateData: any = {};
@@ -349,10 +407,6 @@ export class BetsService {
 
       if (actualWinnings !== undefined) {
         updateData.actualWinnings = actualWinnings;
-      }
-
-      if (claimSignature !== undefined) {
-        updateData.claimSignature = claimSignature;
       }
 
       const updatedBetSlip = await this.betSlipModel.findOneAndUpdate(
@@ -541,7 +595,9 @@ export class BetsService {
     }
   }
 
-  async findUserBetSlips(userAddress: string): Promise<BetSlipAndSelection[]> {
+  private async findUserBetSlips(
+    userAddress: string,
+  ): Promise<BetSlipAndSelection[]> {
     try {
       const betSlips = await this.betSlipModel.find({
         userAddress: userAddress,
@@ -628,7 +684,34 @@ export class BetsService {
     }
   }
 
-  async findBetSlipsByBlockchain(blockchain: Blockchain): Promise<BetSlipAndSelection[]> {
+  async findUserPendingSlips(
+    userAddress: string,
+  ): Promise<BetSlipAndSelection[]> {
+    try {
+      const userBets = await this.findUserBetSlips(userAddress);
+
+      const pendingBets = userBets.filter((bets) => {
+        const pendingBets = bets.betSlip.status === 'pending';
+
+        return pendingBets;
+      });
+
+      return pendingBets;
+    } catch (error: any) {
+      throw new HttpException(
+        `Error Finding User Bets: ${error.message}`,
+        HttpStatus.BAD_GATEWAY,
+        {
+          cause: error.message,
+          description: error,
+        },
+      );
+    }
+  }
+
+  async findBetSlipsByBlockchain(
+    blockchain: Blockchain,
+  ): Promise<BetSlipAndSelection[]> {
     try {
       const betSlips = await this.betSlipModel.find({ blockchain }).exec();
       const result: BetSlipAndSelection[] = [];
@@ -728,10 +811,10 @@ export class BetsService {
     }
   }
 
-  async markBetSlipAsClaimed({ betSlipId }: { betSlipId: string }) {
+  async markBetSlipAsClaimed({ id }: { id: string }) {
     try {
-      const updatedBetSlip = await this.betSlipModel.findOneAndUpdate(
-        { betSlipId: parseInt(betSlipId) },
+      const updatedBetSlip = await this.betSlipModel.findByIdAndUpdate(
+        id,
         {
           claimSignature: '',
           isClaimed: true,
@@ -743,7 +826,7 @@ export class BetsService {
 
       if (!updatedBetSlip) {
         throw new HttpException(
-          `Bet slip with ID ${betSlipId} not found`,
+          `Bet slip with ID ${id} not found`,
           HttpStatus.NOT_FOUND,
         );
       }

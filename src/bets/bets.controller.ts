@@ -102,7 +102,9 @@ export class BetsController {
   async findUserBetSlips(
     @Param('userAddress') userAddress: string,
   ): Promise<BetSlipAndSelection[]> {
-    return await this.betsService.findUserBetSlips(userAddress);
+    return await this.betsService.findUserPendingSlips(
+      userAddress.toLowerCase(),
+    );
   }
 
   @Get('/user/unclaimed/:userAddress')
@@ -116,7 +118,9 @@ export class BetsController {
   async findUserUnclaimedBetSlips(
     @Param('userAddress') userAddress: string,
   ): Promise<BetSlipAndSelection[]> {
-    return await this.betsService.findUserUnclaimedWinnings(userAddress);
+    return await this.betsService.findUserUnclaimedWinnings(
+      userAddress.toLowerCase(),
+    );
   }
 
   @Get('/user/claimed/:userAddress')
@@ -130,82 +134,101 @@ export class BetsController {
   async findUserClaimedBetSlips(
     @Param('userAddress') userAddress: string,
   ): Promise<BetSlipAndSelection[]> {
-    return await this.betsService.findUserClaimedWinnings(userAddress);
+    return await this.betsService.findUserClaimedWinnings(
+      userAddress.toLowerCase(),
+    );
   }
 
-  @Get('/blockchain/:blockchain')
-  @ApiOperation({ summary: 'Get all bet slips by blockchain' })
-  @ApiParam({ name: 'blockchain', description: 'Blockchain name (crossfi or bnb)', enum: ['crossfi', 'bnb'] })
-  @ApiResponse({
-    status: 200,
-    description: 'List of bet slips for the specified blockchain',
-    type: [BetSlipAndSelectionResponseDto],
-  })
-  async findBetSlipsByBlockchain(
-    @Param('blockchain') blockchain: Blockchain,
-  ): Promise<BetSlipAndSelection[]> {
-    return await this.betsService.findBetSlipsByBlockchain(blockchain);
-  }
+  // @Get('/blockchain/:blockchain')
+  // @ApiOperation({ summary: 'Get all bet slips by blockchain' })
+  // @ApiParam({
+  //   name: 'blockchain',
+  //   description: 'Blockchain name (crossfi or bnb)',
+  //   enum: ['crossfi', 'bnb'],
+  // })
+  // @ApiResponse({
+  //   status: 200,
+  //   description: 'List of bet slips for the specified blockchain',
+  //   type: [BetSlipAndSelectionResponseDto],
+  // })
+  // async findBetSlipsByBlockchain(
+  //   @Param('blockchain') blockchain: Blockchain,
+  // ): Promise<BetSlipAndSelection[]> {
+  //   return await this.betsService.findBetSlipsByBlockchain(blockchain);
+  // }
 
-  @Get('/user/:userAddress/blockchain/:blockchain')
-  @ApiOperation({ summary: 'Get user bet slips by blockchain' })
-  @ApiParam({ name: 'userAddress', description: 'User wallet address' })
-  @ApiParam({ name: 'blockchain', description: 'Blockchain name (crossfi or bnb)', enum: ['crossfi', 'bnb'] })
-  @ApiResponse({
-    status: 200,
-    description: 'User bet slips for the specified blockchain found',
-    type: [BetSlipAndSelectionResponseDto],
-  })
-  async findUserBetSlipsByBlockchain(
-    @Param('userAddress') userAddress: string,
-    @Param('blockchain') blockchain: Blockchain,
-  ): Promise<BetSlipAndSelection[]> {
-    return await this.betsService.findUserBetSlipsByBlockchain(userAddress, blockchain);
-  }
+  // @Get('/user/:userAddress/blockchain/:blockchain')
+  // @ApiOperation({ summary: 'Get user bet slips by blockchain' })
+  // @ApiParam({ name: 'userAddress', description: 'User wallet address' })
+  // @ApiParam({
+  //   name: 'blockchain',
+  //   description: 'Blockchain name (crossfi or bnb)',
+  //   enum: ['crossfi', 'bnb'],
+  // })
+  // @ApiResponse({
+  //   status: 200,
+  //   description: 'User bet slips for the specified blockchain found',
+  //   type: [BetSlipAndSelectionResponseDto],
+  // })
+  // async findUserBetSlipsByBlockchain(
+  //   @Param('userAddress') userAddress: string,
+  //   @Param('blockchain') blockchain: Blockchain,
+  // ): Promise<BetSlipAndSelection[]> {
+  //   return await this.betsService.findUserBetSlipsByBlockchain(
+  //     userAddress.toLowerCase(),
+  //     blockchain,
+  //   );
+  // }
 
-  @Get('/blockchains')
-  @ApiOperation({ summary: 'Get all supported blockchains' })
-  @ApiResponse({
-    status: 200,
-    description: 'List of supported blockchains',
-  })
-  async getSupportedBlockchains() {
-    const blockchains = this.blockchainService.getSupportedBlockchains();
-    return {
-      blockchains: blockchains.map(chain => this.blockchainService.getBlockchainInfo(chain)),
-      defaultChain: this.blockchainService.getDefaultBlockchain(),
-    };
-  }
+  // @Get('/blockchains')
+  // @ApiOperation({ summary: 'Get all supported blockchains' })
+  // @ApiResponse({
+  //   status: 200,
+  //   description: 'List of supported blockchains',
+  // })
+  // async getSupportedBlockchains() {
+  //   const blockchains = this.blockchainService.getSupportedBlockchains();
+  //   return {
+  //     blockchains: blockchains.map((chain) =>
+  //       this.blockchainService.getBlockchainInfo(chain),
+  //     ),
+  //     defaultChain: this.blockchainService.getDefaultBlockchain(),
+  //   };
+  // }
 
-  @Get('/blockchains/:blockchain')
-  @ApiOperation({ summary: 'Get blockchain information' })
-  @ApiParam({ name: 'blockchain', description: 'Blockchain name (crossfi or bnb)', enum: ['crossfi', 'bnb'] })
-  @ApiResponse({
-    status: 200,
-    description: 'Blockchain information',
-  })
-  async getBlockchainInfo(@Param('blockchain') blockchain: Blockchain) {
-    return this.blockchainService.getBlockchainInfo(blockchain);
-  }
+  // @Get('/blockchains/:blockchain')
+  // @ApiOperation({ summary: 'Get blockchain information' })
+  // @ApiParam({
+  //   name: 'blockchain',
+  //   description: 'Blockchain name (crossfi or bnb)',
+  //   enum: ['crossfi', 'bnb'],
+  // })
+  // @ApiResponse({
+  //   status: 200,
+  //   description: 'Blockchain information',
+  // })
+  // async getBlockchainInfo(@Param('blockchain') blockchain: Blockchain) {
+  //   return this.blockchainService.getBlockchainInfo(blockchain);
+  // }
 
-  @Patch(':id')
-  @ApiOperation({ summary: 'Update bet slip' })
-  @ApiParam({ name: 'id', description: 'Bet slip ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Bet slip updated successfully',
-    type: BetSlip,
-  })
-  @ApiResponse({ status: 404, description: 'Bet slip not found' })
-  async updateBetSlip(
-    @Param('id') id: string,
-    @Body() updateBetSlipDto: UpdateBetSlipDto,
-  ): Promise<BetSlip> {
-    return await this.betsService.updateBetSlip({
-      betSlipId: id,
-      ...updateBetSlipDto,
-    });
-  }
+  // @Patch(':id')
+  // @ApiOperation({ summary: 'Update bet slip' })
+  // @ApiParam({ name: 'id', description: 'Bet slip ID' })
+  // @ApiResponse({
+  //   status: 200,
+  //   description: 'Bet slip updated successfully',
+  //   type: BetSlip,
+  // })
+  // @ApiResponse({ status: 404, description: 'Bet slip not found' })
+  // async updateBetSlip(
+  //   @Param('id') id: string,
+  //   @Body() updateBetSlipDto: UpdateBetSlipDto,
+  // ): Promise<BetSlip> {
+  //   return await this.betsService.updateBetSlip({
+  //     betSlipId: id,
+  //     ...updateBetSlipDto,
+  //   });
+  // }
 
   @Post(':id/claim')
   @ApiOperation({ summary: 'Mark bet slip as claimed' })
@@ -217,25 +240,25 @@ export class BetsController {
   })
   @ApiResponse({ status: 404, description: 'Bet slip not found' })
   async claimBetSlip(@Param('id') id: string): Promise<BetSlip> {
-    return await this.betsService.markBetSlipAsClaimed({ betSlipId: id });
+    return await this.betsService.markBetSlipAsClaimed({ id: id });
   }
 
-  @Post(':id/add-signature')
-  @ApiOperation({ summary: 'Add claim signature to bet slip' })
-  @ApiParam({ name: 'id', description: 'Bet slip ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Signature added successfully',
-    type: BetSlip,
-  })
-  @ApiResponse({ status: 404, description: 'Bet slip not found' })
-  async addClaimSignature(
-    @Param('id') id: string,
-    @Body() body: { signature: string },
-  ): Promise<BetSlip> {
-    return await this.betsService.addClaimSignature({
-      betSlipId: id,
-      signature: body.signature,
-    });
-  }
+  // @Post(':id/add-signature')
+  // @ApiOperation({ summary: 'Add claim signature to bet slip' })
+  // @ApiParam({ name: 'id', description: 'Bet slip ID' })
+  // @ApiResponse({
+  //   status: 200,
+  //   description: 'Signature added successfully',
+  //   type: BetSlip,
+  // })
+  // @ApiResponse({ status: 404, description: 'Bet slip not found' })
+  // async addClaimSignature(
+  //   @Param('id') id: string,
+  //   @Body() body: { signature: string },
+  // ): Promise<BetSlip> {
+  //   return await this.betsService.addClaimSignature({
+  //     betSlipId: id,
+  //     signature: body.signature,
+  //   });
+  // }
 }

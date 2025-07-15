@@ -196,7 +196,7 @@ export class MatchesProvider {
         },
         fixtures: fixturesWithCountry.filter((fixture) => {
           return fixture.matchStats.status === 'NS';
-        })
+        }),
       };
 
       groupedFixtures.push(countryFixtures);
@@ -205,7 +205,10 @@ export class MatchesProvider {
     return groupedFixtures;
   }
 
-  public async getDummyFixtures(): Promise<Fixture[]> {
+  public async getDummyFixtures(): Promise<{
+    country: Country;
+    fixtures: Fixture[];
+  }> {
     const today = new Date();
     const date = today.toISOString().split('T')[0];
 
@@ -265,14 +268,34 @@ export class MatchesProvider {
       }),
     );
 
-    return fixturesWithCountry
+    const country: Country = {
+      id: 10000,
+      name: 'Friendly',
+      code: 'FR',
+      flag: 'https://media.api-sports.io/flags/es.svg',
+    };
+
+    const fullFixtures = fixturesWithCountry
       .filter((fixture) => {
         return fixture.matchStats.status === 'NS';
       })
       .slice(0, 30);
+
+    return {
+      country,
+      fixtures: fullFixtures,
+    };
+
+    // return fixturesWithCountry
+    //   .filter((fixture) => {
+    //     return fixture.matchStats.status === 'NS';
+    //   })
+    //   .slice(0, 30);
   }
 
-  private async getPrediction(fixtureId: number): Promise<FormattedPrediction | null> {
+  private async getPrediction(
+    fixtureId: number,
+  ): Promise<FormattedPrediction | null> {
     try {
       const endpoint = `predictions?fixture=${fixtureId}`;
 
@@ -280,16 +303,27 @@ export class MatchesProvider {
         await this.callFootballAPI<PredictionAPIResponse>(endpoint);
 
       // Check if response exists and has data
-      if (!fixturePrediction.response || fixturePrediction.response.length === 0) {
-        this.logger.warn(`No prediction data available for fixture ${fixtureId}`);
+      if (
+        !fixturePrediction.response ||
+        fixturePrediction.response.length === 0
+      ) {
+        this.logger.warn(
+          `No prediction data available for fixture ${fixtureId}`,
+        );
         return null;
       }
 
       const predictionResponse = fixturePrediction.response[0];
 
       // Check if predictionResponse has the required properties
-      if (!predictionResponse || !predictionResponse.predictions || !predictionResponse.comparison) {
-        this.logger.warn(`Invalid prediction data structure for fixture ${fixtureId}`);
+      if (
+        !predictionResponse ||
+        !predictionResponse.predictions ||
+        !predictionResponse.comparison
+      ) {
+        this.logger.warn(
+          `Invalid prediction data structure for fixture ${fixtureId}`,
+        );
         return null;
       }
 
@@ -314,7 +348,9 @@ export class MatchesProvider {
 
       return formattedPrediction;
     } catch (error) {
-      this.logger.error(`Failed to get prediction for fixture ${fixtureId}: ${error.message}`);
+      this.logger.error(
+        `Failed to get prediction for fixture ${fixtureId}: ${error.message}`,
+      );
       return null;
     }
   }
@@ -507,8 +543,8 @@ export class MatchesProvider {
   public getCacheStats(): { size: number; entries: string[] } {
     return {
       size: this.fixtureCache.size,
-      entries: Array.from(this.fixtureCache.keys()).map(key => 
-        key.replace('matches:fixture:', '') // Remove namespace for cleaner display
+      entries: Array.from(this.fixtureCache.keys()).map(
+        (key) => key.replace('matches:fixture:', ''), // Remove namespace for cleaner display
       ),
     };
   }
@@ -529,8 +565,8 @@ export class MatchesProvider {
 
     return {
       size: this.fixtureCache.size,
-      entries: Array.from(this.fixtureCache.keys()).map(key => 
-        key.replace('matches:fixture:', '') // Remove namespace for cleaner display
+      entries: Array.from(this.fixtureCache.keys()).map(
+        (key) => key.replace('matches:fixture:', ''), // Remove namespace for cleaner display
       ),
       totalMemoryUsage: JSON.stringify(Array.from(this.fixtureCache.values()))
         .length,

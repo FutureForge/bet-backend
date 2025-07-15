@@ -1,8 +1,13 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import {
+  ClassSerializerInterceptor,
+  Logger,
+  ValidationPipe,
+} from '@nestjs/common';
 import helmet from 'helmet';
 import * as compression from 'compression';
+import { ResponseInterceptor } from './interceptor/response.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -21,6 +26,8 @@ async function bootstrap() {
   );
 
   app.setGlobalPrefix('api');
+
+  app.useGlobalInterceptors(new ResponseInterceptor());
 
   app.use(helmet());
   app.use(compression());

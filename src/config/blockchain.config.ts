@@ -45,5 +45,6 @@ export default registerAs('blockchain', () => {
   return {
     blockchains,
     defaultChain: process.env.DEFAULT_BLOCKCHAIN || Blockchain.CROSSFI,
+    adminPrivateKey: process.env.ADMIN_PRIVATE_KEY,
   };
 });

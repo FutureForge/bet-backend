@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { MatchesProvider } from './provider/matches-provider.provider';
-import { Fixture, GroupedFixturesResponse } from './types/matches.type';
+import {
+  Country,
+  Fixture,
+  GroupedFixturesResponse,
+} from './types/matches.type';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject } from '@nestjs/common';
 import { Cache } from 'cache-manager';
@@ -23,7 +27,11 @@ export class MatchesService {
     this.logger.debug('Fetching matches data every hour');
     try {
       const fixtures = await this.matchesProvider.getFixtures();
-      await this.cacheManager.set(this.CACHE_KEY_FIXTURES, fixtures, this.CACHE_TTL);
+      await this.cacheManager.set(
+        this.CACHE_KEY_FIXTURES,
+        fixtures,
+        this.CACHE_TTL,
+      );
       this.logger.debug(`Cached ${fixtures.length} country groups for 1 hour`);
     } catch (error) {
       this.logger.error('Failed to fetch and cache matches data:', error);
@@ -39,7 +47,11 @@ export class MatchesService {
       this.logger.debug('Cache miss, fetching fresh data');
       try {
         fixtures = await this.matchesProvider.getFixtures();
-        await this.cacheManager.set(this.CACHE_KEY_FIXTURES, fixtures, this.CACHE_TTL);
+        await this.cacheManager.set(
+          this.CACHE_KEY_FIXTURES,
+          fixtures,
+          this.CACHE_TTL,
+        );
         this.logger.debug(
           `Cached ${fixtures.length} country groups for 1 hour`,
         );
@@ -54,8 +66,14 @@ export class MatchesService {
     return fixtures;
   }
 
-  async getDummyFixtures(): Promise<Fixture[]> {
-    let fixtures = await this.cacheManager.get<Fixture[]>(this.CACHE_KEY_DUMMY_FIXTURES);
+  async getDummyFixtures(): Promise<{
+    country: Country;
+    fixtures: Fixture[];
+  }> {
+    let fixtures = await this.cacheManager.get<{
+      country: Country;
+      fixtures: Fixture[];
+    }>(this.CACHE_KEY_DUMMY_FIXTURES);
 
     if (!fixtures) {
       this.logger.debug('Cache miss, fetching fresh dummy data');
@@ -67,7 +85,7 @@ export class MatchesService {
           this.CACHE_TTL,
         );
         this.logger.debug(
-          `Cached ${fixtures.length} dummy fixtures for 1 hour`,
+          `Cached ${fixtures.fixtures.length} dummy fixtures for 1 hour`,
         );
       } catch (error) {
         this.logger.error('Failed to fetch dummy fixtures data:', error);

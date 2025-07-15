@@ -24,11 +24,15 @@ import { UsersModule } from './users/users.module';
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => ({
-        uri: configService.get<string>('MONGODB_URI'),
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-      }),
+      useFactory: async (configService: ConfigService) => {
+        const mongoUri = configService.get<string>('MONGODB_URI');
+        if (!mongoUri) {
+          throw new Error('MONGODB_URI is required but not set in environment variables');
+        }
+        return {
+          uri: mongoUri,
+        };
+      },
     }),
 
     CacheModule.register({
