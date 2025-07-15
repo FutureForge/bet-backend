@@ -9,6 +9,7 @@ import {
   GroupedFixturesResponse,
   CountryFixtures,
   Country,
+  WidgetConfig,
 } from '../types/matches.type';
 import {
   convertTimestampToTime,
@@ -355,43 +356,33 @@ export class MatchesProvider {
     }
   }
 
-  private leagueWidget({ league }: { league: number }): string {
-    const apiKey = this.configService.get<string>('SPORT_API_KEY');
-
-    return `
-      <div id="wg-api-football-standings"
-        data-host="v3.football.api-sports.io"
-        data-key=${apiKey}
-        data-league=${league}
-        data-team=""
-        data-season=${this.season}
-        data-theme=""
-        data-show-errors="false"
-        data-show-logos="true"
-        class="wg_loader">
-      </div>
-    <script
-      type="module"
-      src="https://widgets.api-sports.io/2.0.3/widgets.js">
-    </script>`;
+  private leagueWidget({ league }: { league: number }): WidgetConfig {
+    return {
+      type: 'standings',
+      config: {
+        host: 'v3.football.api-sports.io',
+        league,
+        team: '',
+        season: this.season,
+        theme: '',
+        showErrors: false,
+        showLogos: true,
+      },
+    };
   }
 
-  private fixtureWidget(fixtureId: string): string {
-    const apiKey = this.configService.get<string>('SPORT_API_KEY');
-
-    return ` <div id="wg-api-football-game"
-        data-host="v3.football.api-sports.io"
-        data-key=${apiKey}
-        data-id=${fixtureId}
-        data-theme=""
-        data-refresh="15"
-        data-show-errors="false"
-         data-show-logos="true">
-      </div>
-      <script
-        type="module"
-        src="https://widgets.api-sports.io/2.0.3/widgets.js">
-      </script> `;
+  private fixtureWidget(fixtureId: string): WidgetConfig {
+    return {
+      type: 'game',
+      config: {
+        host: 'v3.football.api-sports.io',
+        id: fixtureId,
+        theme: '',
+        refresh: 15,
+        showErrors: false,
+        showLogos: true,
+      },
+    };
   }
 
   /**

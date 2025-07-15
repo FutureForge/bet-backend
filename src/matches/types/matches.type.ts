@@ -79,6 +79,31 @@ export type TeamDetails = {
   winner: boolean | null;
 };
 
+export type WidgetConfig =
+  | {
+      type: 'standings';
+      config: {
+        host: string;
+        league: number;
+        team: string;
+        season: number;
+        theme: string;
+        showErrors: boolean;
+        showLogos: boolean;
+      };
+    }
+  | {
+      type: 'game';
+      config: {
+        host: string;
+        id: string;
+        theme: string;
+        refresh: number;
+        showErrors: boolean;
+        showLogos: boolean;
+      };
+    };
+
 export type Fixture = {
   id: number;
   date: string;
@@ -96,7 +121,7 @@ export type Fixture = {
   awayTeamId: number;
   awayTeam: string;
   awayTeamLogo: string;
-  widget: string;
+  widget: WidgetConfig;
   country?: Country;
   prediction?: FormattedPrediction;
   matchStats: {
@@ -332,7 +357,7 @@ export interface Country {
   name: string;
   code: string;
   flag: string;
-  tableWidget?: string;
+  tableWidget?: WidgetConfig;
 }
 
 export type CountryFixtures = {
