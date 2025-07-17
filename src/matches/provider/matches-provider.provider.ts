@@ -280,6 +280,9 @@ export class MatchesProvider {
       .filter((fixture) => {
         return fixture.matchStats.status === 'NS';
       })
+      .filter((fixture) => {
+        return fixture.prediction !== undefined;
+      })
       .slice(0, 30);
 
     return {
