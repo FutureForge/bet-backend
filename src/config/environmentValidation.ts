@@ -4,7 +4,7 @@ export default Joi.object({
   NODE_ENV: Joi.string()
     .valid('production', 'development', 'test', 'staging')
     .default('development'),
-  PORT: Joi.number().default(7777),
+  PORT: Joi.string().optional(),
   HOST: Joi.string().default('0.0.0.0'),
   MONGODB_URI: Joi.string().required(),
   REDIS_URL: Joi.string().required(),

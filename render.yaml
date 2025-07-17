@@ -9,8 +9,6 @@ services:
         value: production
       - key: NODE_OPTIONS
         value: --max-old-space-size=4096
-      - key: PORT
-        value: 10000
       - key: HOST
         value: 0.0.0.0
       # Add your actual environment variables here - these are placeholders
