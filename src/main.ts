@@ -37,8 +37,7 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // Let Render assign the port automatically
-  const port = process.env.PORT || 7777;
+  const port = 7777;
   
   logger.log(`Starting server on port: ${port} (type: ${typeof port})`);
   
