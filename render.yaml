@@ -8,4 +8,41 @@ services:
       - key: NODE_ENV
         value: production
       - key: NODE_OPTIONS
-        value: --max-old-space-size=4096 
+        value: --max-old-space-size=4096
+      - key: PORT
+        value: 10000
+      - key: HOST
+        value: 0.0.0.0
+      # Add your actual environment variables here - these are placeholders
+      - key: MONGODB_URI
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: REDIS_PASSWORD
+        sync: false
+      - key: REDIS_HOST
+        sync: false
+      - key: REDIS_PORT
+        sync: false
+      - key: SPORT_API_URL
+        sync: false
+      - key: SPORT_API_KEY
+        sync: false
+      - key: CROSSFI_RPC_URL
+        sync: false
+      - key: CROSSFI_CONTRACT_ADDRESS
+        sync: false
+      - key: BNB_RPC_URL
+        sync: false
+      - key: BNB_CONTRACT_ADDRESS
+        sync: false
+      - key: DEFAULT_BLOCKCHAIN
+        value: crossfi
+      - key: ADMIN_PRIVATE_KEY
+        sync: false
+      - key: THIRDWEB_CLIENT_ID
+        sync: false
+      - key: THIRDWEB_SERECT
+        sync: false
+      - key: IS_TESTNET
+        value: "true" 

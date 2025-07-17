@@ -37,7 +37,8 @@ async function bootstrap() {
     credentials: true,
   });
 
-  await app.listen(7777);
+  const port = process.env.PORT || 7777;
+  await app.listen(port);
 
   logger.log(
     `Application environment is ${process.env.NODE_ENV}. Running on: ${await app.getUrl()}`,
