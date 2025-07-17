@@ -6,7 +6,7 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import helmet from 'helmet';
-import * as compression from 'compression';
+import compression from 'compression';
 import { ResponseInterceptor } from './interceptor/response.interceptor';
 
 async function bootstrap() {

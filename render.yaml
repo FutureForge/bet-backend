@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: bet-backend
+    runtime: node
+    buildCommand: npm run build
+    startCommand: npm run start:prod
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=4096 
