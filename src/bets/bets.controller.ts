@@ -130,6 +130,22 @@ export class BetsController {
     );
   }
 
+  @Get('/user/lost/:userAddress')
+  @ApiOperation({ summary: 'Get user lost winning bet slips' })
+  @ApiParam({ name: 'userAddress', description: 'User wallet address' })
+  @ApiResponse({
+    status: 200,
+    description: 'User unclaimed winning bet slips found',
+    type: [BetSlipAndSelectionResponseDto],
+  })
+  async findUserLostBet(
+    @Param('userAddress', ToLowerCasePipe) userAddress: string,
+  ): Promise<BetSlipAndSelection[]> {
+    return await this.betsService.findUserLostBet(
+      userAddress.toLowerCase(),
+    );
+  }
+
   @Get('/user/claimed/:userAddress')
   @ApiOperation({ summary: 'Get user claimed winning bet slips' })
   @ApiParam({ name: 'userAddress', description: 'User wallet address' })

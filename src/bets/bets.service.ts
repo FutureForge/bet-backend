@@ -628,6 +628,29 @@ export class BetsService {
     }
   }
 
+  async findUserLostBet(
+    userAddress: string,
+  ): Promise<BetSlipAndSelection[]> {
+    try {
+      const userBets = await this.findUserBetSlips(userAddress);
+
+      const lostBets = userBets.filter((bets) => {
+        return bets.betSlip.betSlipResult === 'lost'
+      })
+
+      return lostBets
+    } catch (error: any) {
+      throw new HttpException(
+        `Error Finding User Unclaimed Winnings: ${error.message}`,
+        HttpStatus.BAD_GATEWAY,
+        {
+          cause: error.message,
+          description: error,
+        },
+      );
+    }
+  }
+
   async findUserUnclaimedWinnings(
     userAddress: string,
   ): Promise<BetSlipAndSelection[]> {
@@ -636,6 +659,7 @@ export class BetsService {
 
       const unclaimedWinnings = userBets.filter((bets) => {
         const unclaimedBets =
+          bets.betSlip.betSlipResult === 'won' &&
           bets.betSlip.actualWinnings !== 0 &&
           bets.betSlip.status === 'resolved' &&
           !bets.betSlip.isClaimed;
@@ -664,6 +688,7 @@ export class BetsService {
 
       const unclaimedWinnings = userBets.filter((bets) => {
         const unclaimedBets =
+          bets.betSlip.betSlipResult === 'won' &&
           bets.betSlip.actualWinnings !== 0 &&
           bets.betSlip.status === 'claimed' &&
           bets.betSlip.isClaimed;
