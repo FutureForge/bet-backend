@@ -8,6 +8,7 @@ import {
   Delete,
   HttpCode,
   HttpStatus,
+  PipeTransform,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { BetsService } from './bets.service';
@@ -21,6 +22,12 @@ import {
 import { BetSlip } from './entities/bet-slip.entity';
 import { BetSelection } from './entities/bet-selection.entity';
 import { BetSlipAndSelection, Blockchain } from './types/bet.types';
+
+class ToLowerCasePipe implements PipeTransform {
+  transform(value: string): string {
+    return value?.toLowerCase();
+  }
+}
 
 @ApiTags('bets')
 @Controller('bets')
@@ -100,7 +107,7 @@ export class BetsController {
     type: [BetSlipAndSelectionResponseDto],
   })
   async findUserBetSlips(
-    @Param('userAddress') userAddress: string,
+    @Param('userAddress', ToLowerCasePipe) userAddress: string,
   ): Promise<BetSlipAndSelection[]> {
     return await this.betsService.findUserPendingSlips(
       userAddress.toLowerCase(),
@@ -116,7 +123,7 @@ export class BetsController {
     type: [BetSlipAndSelectionResponseDto],
   })
   async findUserUnclaimedBetSlips(
-    @Param('userAddress') userAddress: string,
+    @Param('userAddress', ToLowerCasePipe) userAddress: string,
   ): Promise<BetSlipAndSelection[]> {
     return await this.betsService.findUserUnclaimedWinnings(
       userAddress.toLowerCase(),
@@ -132,7 +139,7 @@ export class BetsController {
     type: [BetSlipAndSelectionResponseDto],
   })
   async findUserClaimedBetSlips(
-    @Param('userAddress') userAddress: string,
+    @Param('userAddress', ToLowerCasePipe) userAddress: string,
   ): Promise<BetSlipAndSelection[]> {
     return await this.betsService.findUserClaimedWinnings(
       userAddress.toLowerCase(),

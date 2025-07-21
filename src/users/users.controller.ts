@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  PipeTransform,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -23,6 +24,12 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { LeaderboardQueryDto } from './dto/leaderboard.dto';
 import { LeaderboardEntryDto } from './dto/leaderboard-response.dto';
 import { User } from './entities/user.entity';
+
+class ToLowerCasePipe implements PipeTransform {
+  transform(value: string): string {
+    return value?.toLowerCase();
+  }
+}
 
 @ApiTags('users')
 @Controller('users')
@@ -62,7 +69,7 @@ export class UsersController {
   @ApiParam({ name: 'address', description: 'XFI wallet address' })
   @ApiResponse({ status: 200, description: 'User found', type: User })
   @ApiResponse({ status: 404, description: 'User not found' })
-  findByAddress(@Param('address') address: string): Promise<User | null> {
+  findByAddress(@Param('address', ToLowerCasePipe) address: string): Promise<User | null> {
     return this.usersService.findByAddress(address);
   }
 
@@ -107,7 +114,7 @@ export class UsersController {
   })
   @ApiResponse({ status: 404, description: 'User not found' })
   update(
-    @Param('address') address: string,
+    @Param('address', ToLowerCasePipe) address: string,
     @Body() updateUserDto: UpdateUserDto,
   ): Promise<User> {
     return this.usersService.update({ address, updateUserDto });
@@ -123,7 +130,7 @@ export class UsersController {
   })
   @ApiResponse({ status: 404, description: 'User not found' })
   updateStats(
-    @Param('address') address: string,
+    @Param('address', ToLowerCasePipe) address: string,
     @Body()
     stats: {
       totalWagered?: number;

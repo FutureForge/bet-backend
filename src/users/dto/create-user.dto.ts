@@ -1,9 +1,11 @@
 import { IsString, IsOptional, IsNumber, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 
 export class CreateUserDto {
   @ApiProperty({ description: 'XFI wallet address' })
   @IsString()
+  @Transform(({value}: {value:string}) => {value.toLowerCase()})
   address: string;
 
   @ApiPropertyOptional({ description: 'Username (optional)' })
