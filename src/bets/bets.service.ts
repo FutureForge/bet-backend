@@ -220,11 +220,10 @@ export class BetsService {
             actualWinnings,
           });
 
-          // Update user stats
+          // Update user stats (totalWagered is already updated during bet creation)
           await this.usersService.updateStats({
             address: betSlipData.betSlip.userAddress,
             stats: {
-              totalWagered: betSlipData.betSlip.totalBetAmount,
               totalWon: actualWinnings,
               winCount: betSlipResult === 'won' ? 1 : 0,
               lossCount: betSlipResult === 'lost' ? 1 : 0,
@@ -358,6 +357,15 @@ export class BetsService {
 
       const savedBetSelection =
         await this.betSelectionModel.insertMany(betSelections);
+
+      // Update user's totalWagered stats immediately upon bet creation
+      await this.usersService.updateStats({
+        address: userAddress,
+        stats: {
+          totalWagered: totalBetAmount,
+        },
+        blockchain: blockchain,
+      });
 
       return {
         betSlip: savedBetSlip,
