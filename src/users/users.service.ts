@@ -147,6 +147,7 @@ export class UsersService {
   async updateStats({
     address,
     stats,
+    blockchain,
   }: {
     address: string;
     stats: {
@@ -155,6 +156,7 @@ export class UsersService {
       winCount?: number;
       lossCount?: number;
     };
+    blockchain?: 'crossfi' | 'bnb';
   }): Promise<User> {
     try {
       if (!address) {
@@ -166,17 +168,36 @@ export class UsersService {
 
       const updateData: any = { lastActiveAt: new Date() };
 
-      if (stats.totalWagered !== undefined) {
-        updateData.$inc = { totalWagered: stats.totalWagered };
-      }
-      if (stats.totalWon !== undefined) {
-        updateData.$inc = { ...updateData.$inc, totalWon: stats.totalWon };
-      }
-      if (stats.winCount !== undefined) {
-        updateData.$inc = { ...updateData.$inc, winCount: stats.winCount };
-      }
-      if (stats.lossCount !== undefined) {
-        updateData.$inc = { ...updateData.$inc, lossCount: stats.lossCount };
+      // If blockchain is specified, update blockchain-specific stats
+      if (blockchain) {
+        const prefix = blockchain === 'crossfi' ? 'crossfi' : 'bnb';
+        
+        if (stats.totalWagered !== undefined) {
+          updateData.$inc = { [`${prefix}TotalWagered`]: stats.totalWagered };
+        }
+        if (stats.totalWon !== undefined) {
+          updateData.$inc = { ...updateData.$inc, [`${prefix}TotalWon`]: stats.totalWon };
+        }
+        if (stats.winCount !== undefined) {
+          updateData.$inc = { ...updateData.$inc, [`${prefix}WinCount`]: stats.winCount };
+        }
+        if (stats.lossCount !== undefined) {
+          updateData.$inc = { ...updateData.$inc, [`${prefix}LossCount`]: stats.lossCount };
+        }
+      } else {
+        // Legacy support - update global stats (deprecated)
+        if (stats.totalWagered !== undefined) {
+          updateData.$inc = { totalWagered: stats.totalWagered };
+        }
+        if (stats.totalWon !== undefined) {
+          updateData.$inc = { ...updateData.$inc, totalWon: stats.totalWon };
+        }
+        if (stats.winCount !== undefined) {
+          updateData.$inc = { ...updateData.$inc, winCount: stats.winCount };
+        }
+        if (stats.lossCount !== undefined) {
+          updateData.$inc = { ...updateData.$inc, lossCount: stats.lossCount };
+        }
       }
 
       const user = await this.userModel
@@ -210,24 +231,33 @@ export class UsersService {
     type = 'totalWon',
     limit = 10,
     offset = 0,
+    blockchain,
   }: {
     type?: 'totalWon' | 'totalWagered' | 'winCount' | 'winRate';
     limit?: number;
     offset?: number;
+    blockchain?: 'crossfi' | 'bnb';
   }): Promise<LeaderboardEntryDto[]> {
     try {
       let sortCriteria: any = {};
       let projection: any = {};
 
+      // Determine which fields to use based on blockchain
+      const prefix = blockchain === 'crossfi' ? 'crossfi' : blockchain === 'bnb' ? 'bnb' : '';
+      const totalWonField = prefix ? `${prefix}TotalWon` : 'totalWon';
+      const totalWageredField = prefix ? `${prefix}TotalWagered` : 'totalWagered';
+      const winCountField = prefix ? `${prefix}WinCount` : 'winCount';
+      const lossCountField = prefix ? `${prefix}LossCount` : 'lossCount';
+
       switch (type) {
         case 'totalWon':
-          sortCriteria = { totalWon: -1 };
+          sortCriteria = { [totalWonField]: -1 };
           break;
         case 'totalWagered':
-          sortCriteria = { totalWagered: -1 };
+          sortCriteria = { [totalWageredField]: -1 };
           break;
         case 'winCount':
-          sortCriteria = { winCount: -1 };
+          sortCriteria = { [winCountField]: -1 };
           break;
         case 'winRate':
           // For win rate, we'll calculate it in the aggregation pipeline
@@ -236,10 +266,10 @@ export class UsersService {
               $addFields: {
                 winRate: {
                   $cond: {
-                    if: { $gt: [{ $add: ['$winCount', '$lossCount'] }, 0] },
+                    if: { $gt: [{ $add: [`$${winCountField}`, `$${lossCountField}`] }, 0] },
                     then: {
                       $multiply: [
-                        { $divide: ['$winCount', { $add: ['$winCount', '$lossCount'] }] },
+                        { $divide: [`$${winCountField}`, { $add: [`$${winCountField}`, `$${lossCountField}`] }] },
                         100
                       ]
                     },
@@ -260,10 +290,10 @@ export class UsersService {
             _id: user._id.toString(),
             address: user.address,
             username: user.username,
-            totalWagered: user.totalWagered,
-            totalWon: user.totalWon,
-            winCount: user.winCount,
-            lossCount: user.lossCount,
+            totalWagered: user[totalWageredField] || 0,
+            totalWon: user[totalWonField] || 0,
+            winCount: user[winCountField] || 0,
+            lossCount: user[lossCountField] || 0,
             rank: offset + index + 1,
             winRate: user.winRate,
             createdAt: user.createdAt,
@@ -284,17 +314,17 @@ export class UsersService {
 
         // Calculate win rate for each user and transform to DTO format
         const usersWithRank = users.map((user, index) => {
-          const totalGames = user.winCount + user.lossCount;
-          const winRate = totalGames > 0 ? (user.winCount / totalGames) * 100 : 0;
+          const totalGames = (user[winCountField] || 0) + (user[lossCountField] || 0);
+          const winRate = totalGames > 0 ? ((user[winCountField] || 0) / totalGames) * 100 : 0;
           
           return {
             _id: user._id.toString(),
             address: user.address,
             username: user.username,
-            totalWagered: user.totalWagered,
-            totalWon: user.totalWon,
-            winCount: user.winCount,
-            lossCount: user.lossCount,
+            totalWagered: user[totalWageredField] || 0,
+            totalWon: user[totalWonField] || 0,
+            winCount: user[winCountField] || 0,
+            lossCount: user[lossCountField] || 0,
             rank: offset + index + 1,
             winRate: Math.round(winRate * 100) / 100, // Round to 2 decimal places
             createdAt: user.createdAt,
@@ -313,6 +343,60 @@ export class UsersService {
 
       throw new HttpException(
         `Error fetching leaderboard: ${error.message}`,
+        HttpStatus.BAD_GATEWAY,
+        {
+          cause: error.message,
+          description: error,
+        },
+      );
+    }
+  }
+
+  async getBlockchainStats({
+    address,
+    blockchain,
+  }: {
+    address: string;
+    blockchain: 'crossfi' | 'bnb';
+  }): Promise<{
+    totalWagered: number;
+    totalWon: number;
+    winCount: number;
+    lossCount: number;
+    winRate: number;
+  }> {
+    try {
+      const user = await this.userModel.findOne({ address }).exec();
+      
+      if (!user) {
+        throw new HttpException(
+          `User with address ${address} not found`,
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      const prefix = blockchain === 'crossfi' ? 'crossfi' : 'bnb';
+      const totalWagered = user[`${prefix}TotalWagered`] || 0;
+      const totalWon = user[`${prefix}TotalWon`] || 0;
+      const winCount = user[`${prefix}WinCount`] || 0;
+      const lossCount = user[`${prefix}LossCount`] || 0;
+      const totalGames = winCount + lossCount;
+      const winRate = totalGames > 0 ? (winCount / totalGames) * 100 : 0;
+
+      return {
+        totalWagered,
+        totalWon,
+        winCount,
+        lossCount,
+        winRate: Math.round(winRate * 100) / 100,
+      };
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        `Error fetching blockchain stats: ${error.message}`,
         HttpStatus.BAD_GATEWAY,
         {
           cause: error.message,

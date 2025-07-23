@@ -9,8 +9,9 @@ import {
   HttpCode,
   HttpStatus,
   PipeTransform,
+  Query,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { BetsService } from './bets.service';
 import { BlockchainService } from './services/blockchain.service';
 import { CreateBetDto } from './dto/create-bet.dto';
@@ -94,8 +95,17 @@ export class BetsController {
   @ApiParam({ name: 'id', description: 'Bet slip ID' })
   @ApiResponse({ status: 200, description: 'Bet slip found', type: BetSlip })
   @ApiResponse({ status: 404, description: 'Bet slip not found' })
-  async findByBetSlipId(@Param('id') id: string): Promise<BetSlip> {
-    return await this.betsService.findByBetSlipId(+id);
+  @ApiQuery({ 
+    name: 'blockchain', 
+    required: false, 
+    description: 'Blockchain to filter by (crossfi or bnb). If not provided, searches across all blockchains.',
+    enum: ['crossfi', 'bnb']
+  })
+  async findByBetSlipId(
+    @Param('id') id: string,
+    @Query('blockchain') blockchain?: Blockchain,
+  ): Promise<BetSlip> {
+    return await this.betsService.findByBetSlipId(+id, blockchain);
   }
 
   @Get('/user/:userAddress')

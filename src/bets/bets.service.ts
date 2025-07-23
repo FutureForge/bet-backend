@@ -229,6 +229,7 @@ export class BetsService {
               winCount: betSlipResult === 'won' ? 1 : 0,
               lossCount: betSlipResult === 'lost' ? 1 : 0,
             },
+            blockchain: betSlipData.betSlip.blockchain,
           });
 
           this.logger.debug(
@@ -279,14 +280,15 @@ export class BetsService {
         );
       }
 
-      // checking is betSlipId is in Bet-Slip-Entity
+      // checking if betSlipId already exists for this blockchain
       const existingBet = await this.betSlipModel.findOne({
+        blockchain: blockchain,
         betSlipId: betSlipId,
       });
 
       if (existingBet) {
         throw new HttpException(
-          `Bet with ID: ${betSlipId} already exist`,
+          `Bet with ID: ${betSlipId} already exists for blockchain ${blockchain}`,
           HttpStatus.CONFLICT,
         );
       }
@@ -569,16 +571,24 @@ export class BetsService {
     }
   }
 
-  async findByBetSlipId(betSlipId: number): Promise<BetSlip> {
+  async findByBetSlipId(betSlipId: number, blockchain?: Blockchain): Promise<BetSlip> {
     try {
-      const betSlip = await this.betSlipModel.findOne({
-        betSlipId: betSlipId,
-      });
+      const query: any = { betSlipId: betSlipId };
+      
+      // If blockchain is provided, filter by it
+      if (blockchain) {
+        query.blockchain = blockchain;
+      }
+
+      const betSlip = await this.betSlipModel.findOne(query);
 
       if (!betSlip) {
+        const errorMessage = blockchain 
+          ? `Can't find bet slip with ID ${betSlipId} for blockchain ${blockchain}`
+          : `Can't find bet slip with ID ${betSlipId}`;
         throw new HttpException(
-          `Can't find bet slip based on ${betSlipId}`,
-          HttpStatus.BAD_GATEWAY,
+          errorMessage,
+          HttpStatus.NOT_FOUND,
         );
       }
 

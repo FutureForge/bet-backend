@@ -13,6 +13,33 @@ export class User {
   @Prop()
   username?: string;
 
+  // CrossFi blockchain stats
+  @Prop({ default: 0 })
+  crossfiTotalWagered: number;
+
+  @Prop({ default: 0 })
+  crossfiTotalWon: number;
+
+  @Prop({ default: 0 })
+  crossfiWinCount: number;
+
+  @Prop({ default: 0 })
+  crossfiLossCount: number;
+
+  // BNB blockchain stats
+  @Prop({ default: 0 })
+  bnbTotalWagered: number;
+
+  @Prop({ default: 0 })
+  bnbTotalWon: number;
+
+  @Prop({ default: 0 })
+  bnbWinCount: number;
+
+  @Prop({ default: 0 })
+  bnbLossCount: number;
+
+  // Legacy fields for backward compatibility (deprecated)
   @Prop({ default: 0 })
   totalWagered: number;
 

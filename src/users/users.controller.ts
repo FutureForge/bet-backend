@@ -93,6 +93,12 @@ export class UsersController {
     type: Number,
     description: 'Number of results to skip for pagination',
   })
+  @ApiQuery({
+    name: 'blockchain',
+    required: false,
+    enum: ['crossfi', 'bnb'],
+    description: 'Blockchain to filter leaderboard by',
+  })
   @ApiResponse({
     status: 200,
     description: 'Leaderboard retrieved successfully',
@@ -102,6 +108,22 @@ export class UsersController {
     @Query() query: LeaderboardQueryDto,
   ): Promise<LeaderboardEntryDto[]> {
     return this.usersService.getLeaderboard(query);
+  }
+
+  @Get(':address/stats/:blockchain')
+  @ApiOperation({ summary: 'Get user statistics for specific blockchain' })
+  @ApiParam({ name: 'address', description: 'User address' })
+  @ApiParam({ name: 'blockchain', description: 'Blockchain (crossfi or bnb)', enum: ['crossfi', 'bnb'] })
+  @ApiResponse({
+    status: 200,
+    description: 'User blockchain stats retrieved successfully',
+  })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  getBlockchainStats(
+    @Param('address', ToLowerCasePipe) address: string,
+    @Param('blockchain') blockchain: 'crossfi' | 'bnb',
+  ) {
+    return this.usersService.getBlockchainStats({ address, blockchain });
   }
 
   @Patch(':address')
@@ -132,14 +154,21 @@ export class UsersController {
   updateStats(
     @Param('address', ToLowerCasePipe) address: string,
     @Body()
-    stats: {
-      totalWagered?: number;
-      totalWon?: number;
-      winCount?: number;
-      lossCount?: number;
+    body: {
+      stats: {
+        totalWagered?: number;
+        totalWon?: number;
+        winCount?: number;
+        lossCount?: number;
+      };
+      blockchain?: 'crossfi' | 'bnb';
     },
   ): Promise<User> {
-    return this.usersService.updateStats({ address, stats });
+    return this.usersService.updateStats({ 
+      address, 
+      stats: body.stats, 
+      blockchain: body.blockchain 
+    });
   }
 
   @Delete(':id')

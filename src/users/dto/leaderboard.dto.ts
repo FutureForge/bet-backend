@@ -35,4 +35,12 @@ export class LeaderboardQueryDto {
   @Min(0)
   @Transform(({ value }) => parseInt(value))
   offset?: number;
+
+  @ApiPropertyOptional({
+    description: 'Blockchain to filter leaderboard by',
+    enum: ['crossfi', 'bnb'],
+  })
+  @IsOptional()
+  @IsEnum(['crossfi', 'bnb'])
+  blockchain?: 'crossfi' | 'bnb';
 }

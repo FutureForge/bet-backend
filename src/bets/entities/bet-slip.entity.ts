@@ -31,13 +31,12 @@ export class BetSlip {
   blockchain: Blockchain;
 
   @ApiProperty({
-    description: 'Unique ID of the bet slip',
+    description: 'Unique ID of the bet slip within the blockchain',
     example: '12345',
   })
   @Prop({
     type: Number,
     required: true,
-    unique: true,
   })
   betSlipId: number;
 
@@ -169,3 +168,6 @@ export class BetSlip {
 export type BetSlipDocument = HydratedDocument<BetSlip>;
 
 export const BetSlipSchema = SchemaFactory.createForClass(BetSlip);
+
+// Add compound unique index on blockchain + betSlipId
+BetSlipSchema.index({ blockchain: 1, betSlipId: 1 }, { unique: true });
