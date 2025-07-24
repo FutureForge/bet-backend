@@ -70,11 +70,11 @@ export class BetsService {
   private async generateClaimSignature(betSlip: BetSlip): Promise<string> {
     const privateKey = this.blockchainConfiguration.adminPrivateKey;
     const wallet = new ethers.Wallet(privateKey);
-
-    const reward = ethers.parseEther(betSlip.actualWinnings.toString());
-    const betId = betSlip.betSlipId;
-    const userAddress = betSlip.userAddress;
-
+  
+    const userAddress = ethers.getAddress(betSlip.userAddress.trim());
+    const betId = BigInt(betSlip.betSlipId);
+    const reward = BigInt(ethers.parseEther(betSlip.actualWinnings.toString()));
+  
     const messageHash = ethers.solidityPackedKeccak256(
       ['address', 'uint256', 'uint256'],
       [userAddress, betId, reward],
@@ -84,18 +84,19 @@ export class BetsService {
     //   ethers.getBytes(messageHash),
     // );
     // const signerAddress = ethers.verifyMessage(ethers.getBytes(messageHash), signature);
-
+  
+    // signMessage auto wraps with Ethereum Signed Message prefix
     const signature = await wallet.signMessage(ethers.getBytes(messageHash));
-
+  
     this.logger.debug(
-      `Signature for betId ${betId} of reward: ${betSlip.actualWinnings} for user ${userAddress} generated = `,
+      `Signature for betId ${betId} of reward ${reward} for user ${userAddress} generated =`,
       signature,
     );
+  
     return signature;
   }
 
   @Cron(CronExpression.EVERY_10_SECONDS)
-  // @Cron('0 */15 * * * *')
   async handleBetResolutions() {
     this.logger.debug('Updating bet slip data every 15 minutes');
     try {
