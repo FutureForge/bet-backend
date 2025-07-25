@@ -580,16 +580,16 @@ export class BetsService {
     }
   }
 
-  async findByBetSlipId(betSlipId: number, blockchain?: Blockchain): Promise<BetSlip> {
+  async findByBetSlipId(betSlipId: string, blockchain?: Blockchain): Promise<BetSlipAndSelection> {
     try {
-      const query: any = { betSlipId: betSlipId };
+      // const query: any = { id: betSlipId };
       
-      // If blockchain is provided, filter by it
-      if (blockchain) {
-        query.blockchain = blockchain;
-      }
+      // // If blockchain is provided, filter by it
+      // if (blockchain) {
+      //   query.blockchain = blockchain;
+      // }
 
-      const betSlip = await this.betSlipModel.findOne(query);
+      const betSlip = await this.betSlipModel.findById(betSlipId);
 
       if (!betSlip) {
         const errorMessage = blockchain 
@@ -601,7 +601,14 @@ export class BetsService {
         );
       }
 
-      return betSlip;
+      const betSelections = await this.betSelectionModel.find({
+        betSlipId: betSlip._id,
+      });
+
+      return {
+        betSlip: betSlip,
+        betSelection: betSelections,
+      };
     } catch (error: any) {
       throw new HttpException(
         `Error Finding Bet Slip: ${error.message}`,

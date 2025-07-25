@@ -93,7 +93,7 @@ export class BetsController {
   @Get(':id')
   @ApiOperation({ summary: 'Get bet slip by ID' })
   @ApiParam({ name: 'id', description: 'Bet slip ID' })
-  @ApiResponse({ status: 200, description: 'Bet slip found', type: BetSlip })
+  @ApiResponse({ status: 200, description: 'Bet slip found', type: BetSlipAndSelectionResponseDto })
   @ApiResponse({ status: 404, description: 'Bet slip not found' })
   @ApiQuery({ 
     name: 'blockchain', 
@@ -104,8 +104,8 @@ export class BetsController {
   async findByBetSlipId(
     @Param('id') id: string,
     @Query('blockchain') blockchain?: Blockchain,
-  ): Promise<BetSlip> {
-    return await this.betsService.findByBetSlipId(+id, blockchain);
+  ): Promise<BetSlipAndSelection> {
+    return await this.betsService.findByBetSlipId(id, blockchain);
   }
 
   @Get('/user/:userAddress')
