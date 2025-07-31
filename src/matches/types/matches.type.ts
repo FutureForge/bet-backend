@@ -366,3 +366,127 @@ export type CountryFixtures = {
 };
 
 export type GroupedFixturesResponse = CountryFixtures[];
+
+// Single Fixture API Types
+export type SingleFixtureAPIResponse = {
+  get: string;
+  parameters: {
+    live?: string;
+    id?: string;
+  };
+  errors: any[];
+  results: number;
+  paging: {
+    current: number;
+    total: number;
+  };
+  response: SingleFixtureResponse[];
+};
+
+export type SingleFixtureResponse = {
+  fixture: {
+    id: number;
+    referee: string | null;
+    timezone: string;
+    date: string;
+    timestamp: number;
+    periods: {
+      first: number | null;
+      second: number | null;
+    };
+    venue: {
+      id: number;
+      name: string;
+      city: string;
+    };
+    status: {
+      long: string;
+      short: string;
+      elapsed: number;
+      extra: number | null;
+    };
+  };
+  league: {
+    id: number;
+    name: string;
+    country: string;
+    logo: string;
+    flag: string;
+    season: number;
+    round: string;
+  };
+  teams: {
+    home: TeamDetails;
+    away: TeamDetails;
+  };
+  goals: {
+    home: number;
+    away: number;
+  };
+  score: {
+    halftime: {
+      home: number | null;
+      away: number | null;
+    };
+    fulltime: {
+      home: number | null;
+      away: number | null;
+    };
+    extratime: {
+      home: number | null;
+      away: number | null;
+    };
+    penalty: {
+      home: number | null;
+      away: number | null;
+    };
+  };
+};
+
+export type SingleFixtureRequest = {
+  fixtureId: string;
+  includePrediction?: boolean;
+  forceRefresh?: boolean;
+};
+
+// Enhanced Fixture type with live data
+export type EnhancedFixture = Fixture & {
+  goals?: {
+    home: number;
+    away: number;
+  };
+  score?: {
+    halftime: {
+      home: number | null;
+      away: number | null;
+    };
+    fulltime: {
+      home: number | null;
+      away: number | null;
+    };
+    extratime: {
+      home: number | null;
+      away: number | null;
+    };
+    penalty: {
+      home: number | null;
+      away: number | null;
+    };
+  };
+  referee?: string | null;
+  periods?: {
+    first: number | null;
+    second: number | null;
+  };
+  venueDetails?: {
+    id: number;
+    name: string;
+    city: string;
+  };
+  status?: {
+    long: string;
+    short: string;
+    elapsed: number;
+    extra: number | null;
+  };
+};

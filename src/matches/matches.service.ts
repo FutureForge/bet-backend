@@ -5,6 +5,8 @@ import {
   Country,
   Fixture,
   GroupedFixturesResponse,
+  EnhancedFixture,
+  SingleFixtureRequest,
 } from './types/matches.type';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject } from '@nestjs/common';
@@ -98,9 +100,22 @@ export class MatchesService {
     return fixtures;
   }
 
-  async getSingleFixture(fixtureId: string): Promise<Fixture> {
-    const fixture = await this.matchesProvider.getSingleFixture(fixtureId);
+  async getSingleFixture(
+    fixtureId: string,
+    options?: Partial<SingleFixtureRequest>
+  ): Promise<EnhancedFixture> {
+    const requestOptions: SingleFixtureRequest = {
+      fixtureId,
+      includePrediction: options?.includePrediction ?? true,
+      forceRefresh: options?.forceRefresh ?? false,
+    };
+
+    const fixture = await this.matchesProvider.getSingleFixture(fixtureId, requestOptions);
     return fixture;
+  }
+
+  async getLiveFixtures(): Promise<EnhancedFixture[]> {
+    return this.matchesProvider.getLiveFixtures();
   }
 
   async clearFixturesCache(): Promise<void> {
@@ -114,6 +129,11 @@ export class MatchesService {
   async clearIndividualFixtureCache(): Promise<void> {
     this.matchesProvider.clearAllFixtureCache();
     this.logger.debug('Individual fixtures cache cleared');
+  }
+
+  async invalidateFixtureCache(fixtureId: string): Promise<void> {
+    this.matchesProvider.invalidateFixtureCache(fixtureId);
+    this.logger.debug(`Individual fixture cache cleared for ${fixtureId}`);
   }
 
   async getCacheStatus(): Promise<{
@@ -134,6 +154,12 @@ export class MatchesService {
       averageEntrySize: number;
       oldestEntry: number | null;
       newestEntry: number | null;
+      rateLimitStats: {
+        callsInLastMinute: number;
+        callsInLastHour: number;
+        lastRateLimitHit: number;
+        isInCooldown: boolean;
+      };
     };
   }> {
     const fixtures = await this.cacheManager.get<GroupedFixturesResponse>(
