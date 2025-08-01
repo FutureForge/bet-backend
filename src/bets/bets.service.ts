@@ -96,7 +96,7 @@ export class BetsService {
     return signature;
   }
 
-  @Cron(CronExpression.EVERY_10_SECONDS)
+  @Cron(CronExpression.EVERY_30_MINUTES)
   async handleBetResolutions() {
     this.logger.debug('Updating bet slip data every 15 minutes');
     try {
