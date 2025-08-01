@@ -280,6 +280,14 @@ export class BetsService {
         );
       }
 
+      // Check if user exists and create if not
+      try {
+        await this.usersService.findByAddress(userAddress);
+      } catch (error) {
+        // User doesn't exist, create them
+        await this.usersService.create({ address: userAddress });
+      }
+
       // checking if betSlipId already exists for this blockchain
       const existingBet = await this.betSlipModel.findOne({
         blockchain: blockchain,
